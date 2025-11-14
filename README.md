@@ -40,8 +40,9 @@ exit
 4. Vue フロント起動
 docker-compose exec frontend npm install
 docker-compose exec frontend npm run dev
+```
 
-## 💻 開発ルール
+## 💻 開発ルール（チーム向け）
 
 - **ブランチ運用**
   - main ブランチには必ず **動作確認済みコードのみ** push
