@@ -1,0 +1,49 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: ./docker/php
+    container_name: critique-php
+    volumes:
+      - ./backend:/var/www
+    depends_on:
+      - db
+
+  web:
+    image: nginx:latest
+    container_name: critique-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+
+  db:
+    image: postgres:15
+    container_name: critique-postgres
+    environment:
+      POSTGRES_DB: critique
+      POSTGRES_USER: critique_user
+      POSTGRES_PASSWORD: critique_pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: critique-frontend
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    stdin_open: true
+    tty: true
+
+volumes:
+  pgdata:
