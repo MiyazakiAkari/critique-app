@@ -5,53 +5,24 @@
 
       <form @submit.prevent="register" class="space-y-4">
 
-        <input
-        v-model="name"
-        placeholder="名前"
-        required
-          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
-        />
+        <input v-model="name" placeholder="名前" required
+          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none" />
 
-        <input
-        v-model="username"
-        type="text"
-        placeholder="ユーザーID"
-        required
-        pattern="[a-zA-Z0-9_]+"
-        title="英数字とアンダースコアのみ使用できます"
-          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
-        />
+        <input v-model="username" type="text" placeholder="ユーザーID" required pattern="[a-zA-Z0-9_]+"
+          title="英数字とアンダースコアのみ使用できます"
+          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none" />
 
-        <input
-        v-model="email"
-        type="email"
-        placeholder="メールアドレス"
-        required
-          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
-        />
+        <input v-model="email" type="email" placeholder="メールアドレス" required
+          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none" />
 
-        <input
-        v-model="password"
-        type="password"
-        placeholder="パスワード"
-        minlength="8"
-        required
-          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
-        />
+        <input v-model="password" type="password" placeholder="パスワード" minlength="8" required
+          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none" />
 
-        <input
-        v-model="password_confirmation"
-        type="password"
-        placeholder="パスワード確認"
-        minlength="8"
-        required
-        class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
-        />
+        <input v-model="password_confirmation" type="password" placeholder="パスワード確認" minlength="8" required
+          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none" />
 
-        <button
-          type="submit"
-          class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
-        >
+        <button type="submit"
+          class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
           登録
         </button>
       </form>
@@ -60,47 +31,51 @@
     </div>
   </div>
 </template>
-  
-  <script setup lang="ts">
-  import api from '../utils/axios';
-  import { ref } from 'vue';
-  
-  const name = ref('');
-  const username = ref('');
-  const email = ref('');
-  const isEmailValid = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const password = ref('');
-  const password_confirmation = ref('');
-  const error = ref<string | null>(null);
-  const register = async () => {
-      if (!isEmailValid(email.value)) {
-          error.value = 'メールアドレスの形式が無効です';
-          return;
-      }
-  const register = async () => {
-    try {
-      const res = await api.post('/register', {
-        name: name.value,
-        username: username.value,
-        email: email.value,
-        password: password.value,
-        password_confirmation: password_confirmation.value,
-      });
-  
-      console.log(res.data);
-      alert("登録が完了しました！");
-    } catch (e: any) {
-      if (e.response?.data?.errors) {
-        error.value = Object.values(e.response.data.errors).flat().join(', ');
-      } else if (e.response?.data?.message) {
-        error.value = e.response.data.message;
-      } else {
-        error.value = '登録に失敗しました';
-      }
+
+<script setup lang="ts">
+import api from '../utils/axios';
+import { ref } from 'vue';
+
+const name = ref('');
+const username = ref('');
+const email = ref('');
+const password = ref('');
+const password_confirmation = ref('');
+const error = ref<string | null>(null);
+
+const validate = () => {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+    return 'メールアドレスの形式が無効です';
+  }
+  if (password.value !== password_confirmation.value) {
+    return 'パスワードが一致しません';
+  }
+  return null;
+};
+
+const register = async () => {
+  error.value = validate();
+  if (error.value) return;
+
+  try {
+    await api.post('/register', {
+      name: name.value,
+      username: username.value,
+      email: email.value,
+      password: password.value,
+      password_confirmation: password_confirmation.value,
+    });
+
+    alert("登録が完了しました！");
+  } catch (e: any) {
+    if (e.response?.data?.errors) {
+      error.value = Object.values(e.response.data.errors).flat().join(', ');
+    } else {
+      error.value = '登録に失敗しました';
     }
-  };
-  </script>
-  
-  <style>
-  </style>
-  
+  }
+};
+</script>
+
+
+<style></style>
