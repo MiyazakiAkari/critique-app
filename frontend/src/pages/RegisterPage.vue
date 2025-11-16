@@ -43,6 +43,7 @@
         v-model="password_confirmation"
         type="password"
         placeholder="パスワード確認"
+        minlength="8"
         required
         class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
         />
@@ -61,19 +62,24 @@
 </template>
   
   <script setup lang="ts">
-  import axios from '../utils/axios';
+  import api from '../utils/axios';
   import { ref } from 'vue';
   
   const name = ref('');
   const username = ref('');
   const email = ref('');
+  const isEmailValid = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const password = ref('');
   const password_confirmation = ref('');
   const error = ref<string | null>(null);
-  
+  const register = async () => {
+      if (!isEmailValid(email.value)) {
+          error.value = 'メールアドレスの形式が無効です';
+          return;
+      }
   const register = async () => {
     try {
-      const res = await axios.post('/register', {
+      const res = await api.post('/register', {
         name: name.value,
         username: username.value,
         email: email.value,

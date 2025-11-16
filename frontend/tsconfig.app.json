@@ -7,8 +7,8 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    // "libReplacement": true, // Remove this line if it exists
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "lib": ["esnext", "dom"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
 }

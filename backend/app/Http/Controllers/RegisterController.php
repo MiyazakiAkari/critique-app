@@ -20,7 +20,7 @@ class RegisterController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json(['errors' => $validator->errors()], 422);
         }
 
         // ユーザー作成
