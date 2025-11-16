@@ -25,15 +25,15 @@ class RegisterController extends Controller
 
         // ユーザー作成
         $user = User::create([
-            'name' => $request->name,
-            'username' => $request->username,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'name' => $request->input('name'),
+            'username' => $request->input('username'),
+            'email' => $request->input('email'),
+            'password' => Hash::make($request->input('password')),
         ]);
 
         return response()->json([
             'message' => 'User registered successfully',
-            'user' => $user
+            'user' => $user->only(['id', 'name', 'username', 'email', 'created_at'])
         ], 201);
     }
 }

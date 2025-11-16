@@ -6,35 +6,45 @@
       <form @submit.prevent="register" class="space-y-4">
 
         <input
-          v-model="name"
-          placeholder="名前"
+        v-model="name"
+        placeholder="名前"
+        required
           class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
         />
 
         <input
-          v-model="username"
-          placeholder="ユーザーID"
+        v-model="username"
+        type="text"
+        placeholder="ユーザーID"
+        required
+        pattern="[a-zA-Z0-9_]+"
+        title="英数字とアンダースコアのみ使用できます"
           class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
         />
 
         <input
-          v-model="email"
-          placeholder="メールアドレス"
+        v-model="email"
+        type="email"
+        placeholder="メールアドレス"
+        required
           class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
         />
 
         <input
-          v-model="password"
-          type="password"
-          placeholder="パスワード"
+        v-model="password"
+        type="password"
+        placeholder="パスワード"
+        minlength="8"
+        required
           class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
         />
 
         <input
-          v-model="password_confirmation"
-          type="password"
-          placeholder="パスワード確認"
-          class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
+        v-model="password_confirmation"
+        type="password"
+        placeholder="パスワード確認"
+        required
+        class="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 focus:outline-none"
         />
 
         <button
@@ -59,7 +69,7 @@
   const email = ref('');
   const password = ref('');
   const password_confirmation = ref('');
-  const error = ref('');
+  const error = ref<string | null>(null);
   
   const register = async () => {
     try {
@@ -74,15 +84,17 @@
       console.log(res.data);
       alert("登録が完了しました！");
     } catch (e: any) {
-      error.value = JSON.stringify(e.response.data);
+      if (e.response?.data?.errors) {
+        error.value = Object.values(e.response.data.errors).flat().join(', ');
+      } else if (e.response?.data?.message) {
+        error.value = e.response.data.message;
+      } else {
+        error.value = '登録に失敗しました';
+      }
     }
   };
   </script>
   
   <style>
-  .form-wrapper {
-    max-width: 400px;
-    margin: 0 auto;
-  }
   </style>
   

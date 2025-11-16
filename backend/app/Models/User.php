@@ -36,19 +36,26 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that should be cast.
      *
-     * @return array<string, string>
+     * @var array<string, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
-    }
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+    ];
 
     public function profile(): HasOne {
         return $this->hasOne(Profile::class);
+    }
+
+    /**
+     * Automatically create a profile when a user is created.
+     */
+    protected static function booted()
+    {
+        static::created(function ($user) {
+            $user->profile()->create();
+        });
     }
 }

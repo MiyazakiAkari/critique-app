@@ -33,35 +33,41 @@
 </template>
 
   
-  <script setup lang="ts">
-  import axios from '../utils/axios';
-  import { ref } from 'vue';
-  
-  const email = ref('');
-  const password = ref('');
-  const error = ref('');
-  
-  const login = async () => {
-    try {
-      const res = await axios.post('/login', {
-        email: email.value,
-        password: password.value,
-      });
-  
-      // Sanctum の API は token を返す
-      localStorage.setItem('token', res.data.token);
-  
-      alert('ログイン成功');
-    } catch (e: any) {
-      error.value = "ログインに失敗しました";
-    }
-  };
-  </script>
-  
-  <style>
-  .form-wrapper {
-    max-width: 400px;
-    margin: 0 auto;
+<script setup lang="ts">
+import { ref } from "vue";
+import api from "../utils/axios";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+
+const email = ref("");
+const password = ref("");
+const error = ref("");
+
+const login = async () => {
+  error.value = "";
+
+  try {
+    await api.get('/sanctum/csrf-cookie');
+
+    await api.post('/login', {
+      email: email.value,
+      password: password.value,
+    });
+
+    const userRes = await api.get("/user");
+    console.log("Logged in as:", userRes.data);
+
+    router.push('/home');
+
+  } catch (e) {
+    console.error("Login error:", e);
+    error.value = "ログインに失敗しました";
   }
-  </style>
+};
+</script>
+
+
+<style>
+</style>
   

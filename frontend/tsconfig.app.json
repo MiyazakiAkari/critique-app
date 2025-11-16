@@ -7,6 +7,7 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    // "libReplacement": true, // Remove this line if it exists
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
