@@ -1,8 +1,7 @@
 {
   "compilerOptions": {
-    "incremental": true,
-    "target": "ESNext",
-    "lib": ["ESNext"],
+    "target": "es2022",
+    "lib": ["ES2022"],
     "module": "ESNext",
     "types": ["node"],
     "skipLibCheck": true,
@@ -18,7 +17,7 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
   },
   "include": ["vite.config.ts"]
 }

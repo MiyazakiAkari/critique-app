@@ -5,6 +5,7 @@ import RegisterPage from '../pages/RegisterPage.vue'
 const routes = [
   { path: '/login', component: LoginPage },
   { path: '/register', component: RegisterPage },
+  { path: "/:pathMatch(.*)*", redirect: "/login" }
 ]
 
 export const router = createRouter({
