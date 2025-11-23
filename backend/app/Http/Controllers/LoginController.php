@@ -18,16 +18,22 @@ class LoginController extends Controller
         ]);
 
         // 認証試行
-        if (!Auth::attempt($request->only('email', 'password'), true)) {
+        if (!Auth::attempt($request->only('email', 'password'))) {
             throw ValidationException::withMessages([
                 'email' => ['ログイン情報が正しくありません。'],
             ]);
         }
 
-        // セッションを再生成（セキュリティ強化）
-        $request->session()->regenerate();
+        $user = Auth::user();
 
-        // 204 No Content → Cookie による認証が成立
-        return response()->noContent();
+        // 既存のパーソナルアクセストークンを削除して一人一枚のトークンに制限
+        $user->tokens()->delete();
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'token' => $token,
+            'user' => $user->only(['id', 'name', 'username', 'email']),
+        ]);
     }
 }

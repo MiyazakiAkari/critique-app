@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import api from "../utils/axios";
+import api, { setAuthToken } from "../utils/axios";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -38,16 +38,23 @@ const login = async () => {
   error.value = "";
 
   try {
-    await api.get('/sanctum/csrf-cookie');
-
-    await api.post('/login', {
+    const loginResponse = await api.post('/login', {
       email: email.value,
       password: password.value,
     });
 
-    const userRes = await api.get("/user");
-    console.log("Logged in as:", userRes.data);
+    const { token, user } = loginResponse.data;
 
+    if (!token) {
+      throw new Error("Token was not returned from the API");
+    }
+
+    setAuthToken(token);
+
+    if (user) {
+      localStorage.setItem("auth_user", JSON.stringify(user));
+    }
+    
     router.push('/home');
 
   } catch (e) {

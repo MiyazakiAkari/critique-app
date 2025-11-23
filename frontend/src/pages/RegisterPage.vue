@@ -33,32 +33,24 @@
 </template>
 
 <script setup lang="ts">
-import api from '../utils/axios';
-import { ref } from 'vue';
+import api, { setAuthToken } from "../utils/axios";
+import { ref } from "vue";
+import { useRouter } from "vue-router";
 
-const name = ref('');
-const username = ref('');
-const email = ref('');
-const password = ref('');
-const password_confirmation = ref('');
+const router = useRouter();
+
+const name = ref("");
+const username = ref("");
+const email = ref("");
+const password = ref("");
+const password_confirmation = ref("");
 const error = ref<string | null>(null);
 
-const validate = () => {
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-    return 'メールアドレスの形式が無効です';
-  }
-  if (password.value !== password_confirmation.value) {
-    return 'パスワードが一致しません';
-  }
-  return null;
-};
-
 const register = async () => {
-  error.value = validate();
-  if (error.value) return;
+  error.value = null;
 
   try {
-    await api.post('/register', {
+    const res = await api.post("/register", {
       name: name.value,
       username: username.value,
       email: email.value,
@@ -66,12 +58,21 @@ const register = async () => {
       password_confirmation: password_confirmation.value,
     });
 
-    alert("登録が完了しました！");
+    // トークンを保存
+    if (res.data.token) {
+      setAuthToken(res.data.token);
+    }
+
+    // /home に遷移
+    router.push("/home");
+
   } catch (e: any) {
     if (e.response?.data?.errors) {
-      error.value = Object.values(e.response.data.errors).flat().join(', ');
+      error.value = Object.values(e.response.data.errors).flat().join(", ");
+    } else if (e.response?.data?.message) {
+      error.value = e.response.data.message;
     } else {
-      error.value = '登録に失敗しました';
+      error.value = "登録に失敗しました";
     }
   }
 };
