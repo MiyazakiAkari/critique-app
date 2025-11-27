@@ -27,7 +27,7 @@
             <span>通知</span>
           </a>
           
-          <a href="#" class="flex items-center space-x-4 px-4 py-3 rounded-full hover:bg-gray-100 text-gray-600">
+          <a @click="goToProfile" class="flex items-center space-x-4 px-4 py-3 rounded-full hover:bg-gray-100 text-gray-600 cursor-pointer">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
             </svg>
@@ -167,8 +167,18 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const activeTab = ref<'recommended' | 'following'>('recommended');
+
+// プロフィールページへ遷移
+const goToProfile = () => {
+  const authUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
+  if (authUser.username) {
+    router.push(`/profile/${authUser.username}`);
+  }
+};
 
 // ダミーデータ - おすすめ投稿
 const recommendedPosts = [
