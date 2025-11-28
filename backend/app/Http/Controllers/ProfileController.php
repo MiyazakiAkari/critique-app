@@ -26,7 +26,6 @@ class ProfileController extends Controller
                 'avatar_url' => null,
             ]);
         }
-
         return response()->json([
             'user' => $user->only(['id', 'name', 'username', 'email', 'created_at']),
             'profile' => $profile->only(['id', 'bio', 'avatar_url', 'updated_at']),
@@ -38,6 +37,7 @@ class ProfileController extends Controller
      */
     public function me()
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $profile = $user->profile;
 
@@ -49,7 +49,6 @@ class ProfileController extends Controller
                 'avatar_url' => null,
             ]);
         }
-
         return response()->json([
             'user' => $user->only(['id', 'name', 'username', 'email', 'created_at']),
             'profile' => $profile->only(['id', 'bio', 'avatar_url', 'updated_at']),
@@ -80,7 +79,6 @@ class ProfileController extends Controller
         } else {
             $profile->update($validated);
         }
-
         return response()->json([
             'message' => 'プロフィールを更新しました',
             'profile' => $profile->only(['id', 'bio', 'avatar_url', 'updated_at']),

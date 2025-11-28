@@ -80,6 +80,21 @@
             >
               プロフィールを編集
             </button>
+            
+            <button 
+              v-else
+              @click="handleFollow"
+              :disabled="followLoading"
+              :class="[
+                'mt-20 px-4 py-2 rounded-full font-semibold transition-colors',
+                followStatus.is_following 
+                  ? 'bg-white border border-gray-300 text-gray-900 hover:bg-red-50 hover:text-red-600 hover:border-red-300' 
+                  : 'bg-blue-500 text-white hover:bg-blue-600',
+                followLoading ? 'opacity-50 cursor-not-allowed' : ''
+              ]"
+            >
+              {{ followLoading ? '処理中...' : (followStatus.is_following ? 'フォロー中' : 'フォローする') }}
+            </button>
           </div>
 
           <div class="mt-4">
@@ -98,11 +113,11 @@
 
             <div class="flex space-x-6 mt-3">
               <div>
-                <span class="font-bold">0</span>
+                <span class="font-bold">{{ followStatus.followings_count }}</span>
                 <span class="text-gray-500 ml-1">フォロー中</span>
               </div>
               <div>
-                <span class="font-bold">0</span>
+                <span class="font-bold">{{ followStatus.followers_count }}</span>
                 <span class="text-gray-500 ml-1">フォロワー</span>
               </div>
             </div>
@@ -213,6 +228,12 @@ const loading = ref(true);
 const error = ref('');
 const isEditing = ref(false);
 const saving = ref(false);
+const followStatus = ref({
+  is_following: false,
+  followers_count: 0,
+  followings_count: 0,
+});
+const followLoading = ref(false);
 
 const editForm = ref({
   bio: '',
@@ -252,11 +273,49 @@ const fetchProfile = async () => {
       bio: profile.value?.bio || '',
       avatar_url: profile.value?.avatar_url || '',
     };
+
+    // フォロー状態を取得（自分のプロフィールの場合は不要）
+    if (!isOwnProfile.value) {
+      await fetchFollowStatus(username);
+    }
   } catch (e: any) {
     console.error('Profile fetch error:', e);
     error.value = e.response?.data?.message || 'プロフィールの取得に失敗しました';
   } finally {
     loading.value = false;
+  }
+};
+
+const fetchFollowStatus = async (username: string) => {
+  try {
+    const response = await api.get(`/users/${username}/follow-status`);
+    followStatus.value = response.data;
+  } catch (e) {
+    console.error('Follow status fetch error:', e);
+  }
+};
+
+const handleFollow = async () => {
+  if (!user.value) return;
+
+  try {
+    followLoading.value = true;
+    const username = user.value.username;
+
+    if (followStatus.value.is_following) {
+      await api.delete(`/users/${username}/follow`);
+      followStatus.value.is_following = false;
+      followStatus.value.followers_count--;
+    } else {
+      await api.post(`/users/${username}/follow`);
+      followStatus.value.is_following = true;
+      followStatus.value.followers_count++;
+    }
+  } catch (e: any) {
+    console.error('Follow error:', e);
+    alert(e.response?.data?.message || 'フォロー操作に失敗しました');
+  } finally {
+    followLoading.value = false;
   }
 };
 
@@ -321,5 +380,4 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* カスタムスタイルが必要な場合はここに追加 */
 </style>
