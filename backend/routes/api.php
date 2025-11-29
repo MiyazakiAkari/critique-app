@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\FollowController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\LogoutController;
 use App\Http\Controllers\ProfileController;
@@ -24,3 +25,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // 公開プロフィール（認証不要）
 Route::get('/profile/{username}', [ProfileController::class, 'show']);
+
+// フォロー関連（認証不要で閲覧可能）
+Route::get('/users/{username}/followers', [FollowController::class, 'followers']);
+Route::get('/users/{username}/followings', [FollowController::class, 'followings']);
+Route::get('/users/{username}/follow-status', [FollowController::class, 'status']);
+
+// フォロー操作（認証必須）
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/users/{username}/follow', [FollowController::class, 'follow']);
+    Route::delete('/users/{username}/follow', [FollowController::class, 'unfollow']);
+});

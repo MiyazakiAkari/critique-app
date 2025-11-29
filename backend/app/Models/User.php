@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -49,6 +50,32 @@ class User extends Authenticatable
 
     public function profile(): HasOne {
         return $this->hasOne(Profile::class);
+    }
+
+    /**
+     * このユーザーがフォローしているユーザー一覧
+     */
+    public function followings(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'follows', 'follower_id', 'following_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * このユーザーをフォローしているユーザー一覧（フォロワー）
+     */
+    public function followers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'follows', 'following_id', 'follower_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * 指定したユーザーをフォローしているかチェック
+     */
+    public function isFollowing(User $user): bool
+    {
+        return $this->followings()->where('following_id', $user->id)->exists();
     }
 
     /**
