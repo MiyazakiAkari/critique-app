@@ -57,9 +57,10 @@ const login = async () => {
     
     router.push('/home');
 
-  } catch (e) {
+  } catch (e: any) {
     console.error("Login error:", e);
-    error.value = "ログインに失敗しました";
+    console.error("Error response:", e.response?.data);
+    error.value = e.response?.data?.message || "ログインに失敗しました";
   }
 };
 </script>
