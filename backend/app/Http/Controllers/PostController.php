@@ -33,6 +33,8 @@ class PostController extends Controller
                 return [
                     'id' => $post->id,
                     'content' => $post->content,
+                    'image_path' => $post->image_path,
+                    'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
                     'created_at' => $post->created_at->toISOString(),
                     'user' => $post->user->only(['id', 'name', 'username']),
                 ];
@@ -56,6 +58,8 @@ class PostController extends Controller
                 return [
                     'id' => $post->id,
                     'content' => $post->content,
+                    'image_path' => $post->image_path,
+                    'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
                     'created_at' => $post->created_at->toISOString(),
                     'user' => $post->user->only(['id', 'name', 'username']),
                 ];
@@ -73,14 +77,19 @@ class PostController extends Controller
     {
         $validated = $request->validate([
             'content' => 'required|string|max:500',
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240', // 10MB
         ]);
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
         
+        // 画像を保存
+        $imagePath = $request->file('image')->store('posts', 'public');
+        
         $post = Post::create([
             'user_id' => $user->id,
             'content' => $validated['content'],
+            'image_path' => $imagePath,
         ]);
 
         $post->load('user:id,name,username');
@@ -90,6 +99,8 @@ class PostController extends Controller
             'post' => [
                 'id' => $post->id,
                 'content' => $post->content,
+                'image_path' => $post->image_path,
+                'image_url' => asset('storage/' . $post->image_path),
                 'created_at' => $post->created_at->toISOString(),
                 'user' => $post->user->only(['id', 'name', 'username']),
             ],
@@ -107,6 +118,8 @@ class PostController extends Controller
             'post' => [
                 'id' => $post->id,
                 'content' => $post->content,
+                'image_path' => $post->image_path,
+                'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
                 'created_at' => $post->created_at->toISOString(),
                 'user' => $post->user->only(['id', 'name', 'username']),
             ],
@@ -150,6 +163,8 @@ class PostController extends Controller
                 return [
                     'id' => $post->id,
                     'content' => $post->content,
+                    'image_path' => $post->image_path,
+                    'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
                     'created_at' => $post->created_at->toISOString(),
                     'user' => $post->user->only(['id', 'name', 'username']),
                 ];
