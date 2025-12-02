@@ -17,14 +17,14 @@ class LoginController extends Controller
             'password' => ['required'],
         ]);
 
-        // 認証試行
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        // 認証試行（webガードを明示的に使用）
+        if (!Auth::guard('web')->attempt($request->only('email', 'password'))) {
             throw ValidationException::withMessages([
                 'email' => ['ログイン情報が正しくありません。'],
             ]);
         }
 
-        $user = Auth::user();
+        $user = Auth::guard('web')->user();
 
         // 既存のパーソナルアクセストークンを削除して一人一枚のトークンに制限
         $user->tokens()->delete();

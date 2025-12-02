@@ -3,6 +3,7 @@
 use App\Http\Controllers\FollowController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\LogoutController;
+use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegisterController;
 use Illuminate\Support\Facades\Route; // Import Route
@@ -36,3 +37,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users/{username}/follow', [FollowController::class, 'follow']);
     Route::delete('/users/{username}/follow', [FollowController::class, 'unfollow']);
 });
+
+// 投稿関連
+Route::get('/posts/recommended', [PostController::class, 'recommended']);
+Route::get('/users/{username}/posts', [PostController::class, 'userPosts']);
+
+// 投稿操作（認証必須）
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/posts/timeline', [PostController::class, 'timeline']);
+    Route::post('/posts', [PostController::class, 'store']);
+    Route::delete('/posts/{post}', [PostController::class, 'destroy']);
+});
+
+Route::get('/posts/{post}', [PostController::class, 'show']);

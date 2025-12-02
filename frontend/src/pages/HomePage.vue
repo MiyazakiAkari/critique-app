@@ -47,7 +47,7 @@
       <div class="sticky top-0 bg-white border-b border-gray-200 z-10">
         <div class="flex">
           <button 
-            @click="activeTab = 'recommended'" 
+            @click="handleTabChange('recommended')" 
             :class="[
               'flex-1 py-4 font-semibold hover:bg-gray-50 transition relative',
               activeTab === 'recommended' ? 'text-gray-900' : 'text-gray-500'
@@ -58,7 +58,7 @@
           </button>
           
           <button 
-            @click="activeTab = 'following'" 
+            @click="handleTabChange('following')" 
             :class="[
               'flex-1 py-4 font-semibold hover:bg-gray-50 transition relative',
               activeTab === 'following' ? 'text-gray-900' : 'text-gray-500'
@@ -76,6 +76,7 @@
           <div class="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
           <div class="flex-1">
             <textarea 
+              v-model="newPostContent"
               placeholder="いまどうしてる？" 
               class="w-full text-xl outline-none resize-none"
               rows="3"
@@ -88,8 +89,12 @@
                   </svg>
                 </button>
               </div>
-              <button class="bg-blue-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                投稿する
+              <button 
+                @click="createPost"
+                :disabled="!newPostContent.trim() || posting"
+                class="bg-blue-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {{ posting ? '投稿中...' : '投稿する' }}
               </button>
             </div>
           </div>
@@ -98,15 +103,33 @@
 
       <!-- タイムライン -->
       <div>
-        <div v-for="post in displayPosts" :key="post.id" class="border-b border-gray-200 p-4 hover:bg-gray-50 cursor-pointer transition">
+        <div v-if="loading" class="p-8 text-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+        </div>
+
+        <div v-else-if="error" class="p-8 text-center text-red-600">
+          {{ error }}
+        </div>
+
+        <div v-else-if="displayPosts.length === 0" class="p-8 text-center text-gray-500">
+          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+          </svg>
+          <p class="text-lg font-semibold mb-2">まだ何もありません</p>
+          <p class="text-sm">
+            {{ activeTab === 'following' ? 'フォローしているユーザーがまだ投稿していません' : '投稿がまだありません。最初の投稿をしてみましょう！' }}
+          </p>
+        </div>
+
+        <div v-else v-for="post in displayPosts" :key="post.id" class="border-b border-gray-200 p-4 hover:bg-gray-50 cursor-pointer transition">
           <div class="flex space-x-3">
             <div class="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
             <div class="flex-1">
               <div class="flex items-center space-x-2">
-                <span class="font-semibold text-gray-900">{{ post.author }}</span>
-                <span class="text-gray-500">@{{ post.username }}</span>
+                <span class="font-semibold text-gray-900">{{ post.user.name }}</span>
+                <span class="text-gray-500">@{{ post.user.username }}</span>
                 <span class="text-gray-500">·</span>
-                <span class="text-gray-500">{{ post.time }}</span>
+                <span class="text-gray-500">{{ formatRelativeTime(post.created_at) }}</span>
               </div>
               <p class="mt-1 text-gray-800">{{ post.content }}</p>
               
@@ -115,21 +138,21 @@
                   <svg class="w-5 h-5 group-hover:bg-blue-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                   </svg>
-                  <span class="text-sm">{{ post.comments }}</span>
+                  <span class="text-sm">0</span>
                 </button>
                 
                 <button class="flex items-center space-x-2 hover:text-green-500 group">
                   <svg class="w-5 h-5 group-hover:bg-green-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                   </svg>
-                  <span class="text-sm">{{ post.retweets }}</span>
+                  <span class="text-sm">0</span>
                 </button>
                 
                 <button class="flex items-center space-x-2 hover:text-red-500 group">
                   <svg class="w-5 h-5 group-hover:bg-red-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
                   </svg>
-                  <span class="text-sm">{{ post.likes }}</span>
+                  <span class="text-sm">0</span>
                 </button>
                 
                 <button class="flex items-center space-x-2 hover:text-blue-500 group">
@@ -144,33 +167,36 @@
       </div>
     </main>
 
-    <!-- 右サイドバー（おすすめユーザーなど） -->
-    <aside class="w-80 p-4 hidden xl:block">
-      <div class="bg-gray-100 rounded-xl p-4">
-        <h2 class="font-bold text-xl mb-4">おすすめユーザー</h2>
-        <div v-for="user in suggestedUsers" :key="user.id" class="flex items-center justify-between py-3">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 bg-gray-300 rounded-full"></div>
-            <div>
-              <div class="font-semibold text-sm">{{ user.name }}</div>
-              <div class="text-gray-500 text-sm">@{{ user.username }}</div>
-            </div>
-          </div>
-          <button class="bg-black text-white px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-gray-800">
-            フォロー
-          </button>
-        </div>
-      </div>
-    </aside>
+    <!-- 右サイドバーは現在非表示 -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import api from '../utils/axios';
 
+interface Post {
+  id: number;
+  content: string;
+  created_at: string;
+  user: {
+    id: number;
+    name: string;
+    username: string;
+  };
+}
 const router = useRouter();
 const activeTab = ref<'recommended' | 'following'>('recommended');
+// 投稿データ
+const recommendedPosts = ref<Post[]>([]);
+const followingPosts = ref<Post[]>([]);
+const loading = ref(false);
+const error = ref('');
+
+// 新規投稿フォーム
+const newPostContent = ref('');
+const posting = ref(false);
 
 // プロフィールページへ遷移
 const goToProfile = () => {
@@ -180,104 +206,112 @@ const goToProfile = () => {
   }
 };
 
-// ダミーデータ - おすすめ投稿
-const recommendedPosts = [
-  {
-    id: 1,
-    author: '田中太郎',
-    username: 'tanaka_taro',
-    time: '2時間前',
-    content: 'Vue 3とTypeScriptでアプリ開発中！Composition APIが使いやすくて最高です 🚀',
-    comments: 12,
-    retweets: 34,
-    likes: 128
-  },
-  {
-    id: 2,
-    author: '山田花子',
-    username: 'yamada_hanako',
-    time: '4時間前',
-    content: '今日のランチは美味しいパスタでした 🍝 おすすめのイタリアンレストラン見つけました！',
-    comments: 8,
-    retweets: 5,
-    likes: 67
-  },
-  {
-    id: 3,
-    author: '佐藤次郎',
-    username: 'sato_jiro',
-    time: '6時間前',
-    content: 'Laravel Sanctumでの認証実装、意外とシンプルでびっくり。ドキュメントがわかりやすい👍',
-    comments: 23,
-    retweets: 45,
-    likes: 234
-  },
-  {
-    id: 4,
-    author: '鈴木美咲',
-    username: 'suzuki_misaki',
-    time: '8時間前',
-    content: '新しいプロジェクト始動！チーム全員でがんばります💪',
-    comments: 15,
-    retweets: 12,
-    likes: 89
-  },
-  {
-    id: 5,
-    author: '高橋健一',
-    username: 'takahashi_kenichi',
-    time: '10時間前',
-    content: 'TypeScriptの型推論、本当に便利。バグが減って開発効率が上がりました',
-    comments: 19,
-    retweets: 28,
-    likes: 156
+// おすすめ投稿を取得
+const fetchRecommendedPosts = async () => {
+  try {
+    loading.value = true;
+    error.value = '';
+    const response = await api.get('/posts/recommended');
+    recommendedPosts.value = response.data.posts;
+  } catch (e: any) {
+    console.error('Failed to fetch recommended posts:', e);
+    console.error('Error response:', e.response?.data);
+    error.value = e.response?.data?.message || 'おすすめ投稿の取得に失敗しました';
+  } finally {
+    loading.value = false;
   }
-];
+};
 
-// ダミーデータ - フォロー中の投稿
-const followingPosts = [
-  {
-    id: 6,
-    author: '友達A',
-    username: 'friend_a',
-    time: '1時間前',
-    content: 'おはようございます！今日も一日頑張りましょう ☀️',
-    comments: 5,
-    retweets: 2,
-    likes: 45
-  },
-  {
-    id: 7,
-    author: '友達B',
-    username: 'friend_b',
-    time: '3時間前',
-    content: '新しいカフェ見つけた！コーヒーが絶品 ☕️',
-    comments: 3,
-    retweets: 1,
-    likes: 23
-  },
-  {
-    id: 8,
-    author: '友達C',
-    username: 'friend_c',
-    time: '5時間前',
-    content: 'ついにプロジェクト完成！達成感がすごい 🎉',
-    comments: 12,
-    retweets: 8,
-    likes: 98
+// フォロー中のタイムラインを取得
+const fetchTimeline = async () => {
+  try {
+    loading.value = true;
+    error.value = '';
+    
+    // 認証トークンの確認
+    const token = localStorage.getItem('auth_token');
+    console.log('Token exists:', !!token);
+    console.log('Authorization header:', api.defaults.headers.common.Authorization);
+    
+    const response = await api.get('/posts/timeline');
+    followingPosts.value = response.data.posts;
+  } catch (e: any) {
+    console.error('Failed to fetch timeline:', e);
+    console.error('Error response:', e.response?.data);
+    console.error('Status code:', e.response?.status);
+    error.value = e.response?.data?.message || 'タイムラインの取得に失敗しました';
+  } finally {
+    loading.value = false;
   }
-];
+};
 
-// ダミーデータ - おすすめユーザー
-const suggestedUsers = [
-  { id: 1, name: '中村涼子', username: 'nakamura_ryoko' },
-  { id: 2, name: '小林大輔', username: 'kobayashi_daisuke' },
-  { id: 3, name: '伊藤美穂', username: 'ito_miho' }
-];
+// 新規投稿を作成
+const createPost = async () => {
+  if (!newPostContent.value.trim()) return;
+  
+  try {
+    posting.value = true;
+    const response = await api.post('/posts', {
+      content: newPostContent.value,
+    });
+    
+    // 投稿をリストの先頭に追加
+    const newPost = response.data.post;
+    recommendedPosts.value.unshift(newPost);
+    followingPosts.value.unshift(newPost);
+    
+    newPostContent.value = '';
+  } catch (e: any) {
+    console.error('Failed to create post:', e);
+    console.error('Error response:', e.response?.data);
+    const errorMessage = e.response?.data?.message || '投稿に失敗しました';
+    error.value = errorMessage;
+  } finally {
+    posting.value = false;
+  }
+};
 
 // 表示する投稿を計算
 const displayPosts = computed(() => {
-  return activeTab.value === 'recommended' ? recommendedPosts : followingPosts;
+  return activeTab.value === 'recommended' ? recommendedPosts.value : followingPosts.value;
+});
+
+// 相対時間を表示
+const formatRelativeTime = (dateString: string) => {
+  if (!dateString) return '';
+  
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return dateString; // fallback to original string
+  }
+  
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'たった今';
+  if (diffMins < 60) return `${diffMins}分前`;
+  if (diffHours < 24) return `${diffHours}時間前`;
+  if (diffDays < 7) return `${diffDays}日前`;
+  
+  return date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+};
+
+// タブ切り替え時にデータを取得
+const handleTabChange = async (tab: 'recommended' | 'following') => {
+  activeTab.value = tab;
+  if (tab === 'recommended') {
+    await fetchRecommendedPosts();
+  } else if (tab === 'following') {
+    await fetchTimeline();
+  }
+};
+
+// 初回マウント時にデータを取得
+onMounted(async () => {
+  await fetchRecommendedPosts();
 });
 </script>
 
