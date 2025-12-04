@@ -81,17 +81,39 @@
               class="w-full text-xl outline-none resize-none"
               rows="3"
             ></textarea>
+            
+            <!-- 画像プレビュー -->
+            <div v-if="imagePreview" class="relative mt-3 rounded-2xl overflow-hidden border border-gray-200">
+              <img :src="imagePreview" alt="Preview" class="w-full max-h-96 object-cover" />
+              <button 
+                @click="removeImage"
+                class="absolute top-2 right-2 bg-gray-900 bg-opacity-75 text-white rounded-full p-2 hover:bg-opacity-90"
+                aria-label="画像を削除"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            
             <div class="flex justify-between items-center mt-3">
               <div class="flex space-x-2 text-blue-500">
-                <button class="p-2 hover:bg-blue-50 rounded-full">
+                <input 
+                  type="file" 
+                  id="image-upload" 
+                  accept="image/*" 
+                  class="hidden"
+                  @change="handleImageSelect"
+                />
+                <label for="image-upload" class="p-2 hover:bg-blue-50 rounded-full cursor-pointer" aria-label="画像を選択">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                   </svg>
-                </button>
+                </label>
               </div>
               <button 
                 @click="createPost"
-                :disabled="!newPostContent.trim() || posting"
+                :disabled="!newPostContent.trim() || !selectedImage || posting"
                 class="bg-blue-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ posting ? '投稿中...' : '投稿する' }}
@@ -133,6 +155,11 @@
               </div>
               <p class="mt-1 text-gray-800">{{ post.content }}</p>
               
+              <!-- 投稿画像 -->
+              <div v-if="post.image_url" class="mt-3 rounded-2xl overflow-hidden border border-gray-200 cursor-pointer" @click="openImageModal(post.image_url)">
+                <img :src="post.image_url" alt="投稿画像" class="w-full max-h-96 object-cover hover:opacity-95 transition" />
+              </div>
+              
               <div class="flex justify-between mt-3 max-w-md text-gray-500">
                 <button class="flex items-center space-x-2 hover:text-blue-500 group">
                   <svg class="w-5 h-5 group-hover:bg-blue-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -168,6 +195,37 @@
     </main>
 
     <!-- 右サイドバーは現在非表示 -->
+    
+    <!-- 画像拡大モーダル -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div 
+          v-if="showImageModal" 
+          role="dialog"
+          aria-modal="true"
+          aria-label="画像拡大表示"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4"
+          @click="closeImageModal"
+        >
+          <button 
+            class="absolute top-4 right-4 text-white hover:text-gray-300 transition"
+            @click="closeImageModal"
+            aria-label="モーダルを閉じる"
+          >
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+          <img 
+            v-if="modalImageUrl"
+            :src="modalImageUrl" 
+            alt="拡大画像" 
+            class="max-w-full max-h-full object-contain"
+            @click.stop
+          />
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -179,6 +237,8 @@ import api from '../utils/axios';
 interface Post {
   id: number;
   content: string;
+  image_path?: string;
+  image_url?: string;
   created_at: string;
   user: {
     id: number;
@@ -196,7 +256,13 @@ const error = ref('');
 
 // 新規投稿フォーム
 const newPostContent = ref('');
+const selectedImage = ref<File | null>(null);
+const imagePreview = ref<string | null>(null);
 const posting = ref(false);
+
+// 画像モーダル
+const showImageModal = ref(false);
+const modalImageUrl = ref<string | null>(null);
 
 // プロフィールページへ遷移
 const goToProfile = () => {
@@ -247,13 +313,18 @@ const fetchTimeline = async () => {
 
 // 新規投稿を作成
 const createPost = async () => {
-  if (!newPostContent.value.trim()) return;
+  if (!newPostContent.value.trim() || !selectedImage.value) return;
   
   try {
     posting.value = true;
-    const response = await api.post('/posts', {
-      content: newPostContent.value,
-    });
+    
+    const formData = new FormData();
+    formData.append('content', newPostContent.value);
+    if (selectedImage.value) {
+      formData.append('image', selectedImage.value);
+    }
+    
+    const response = await api.post('/posts', formData);
     
     // 投稿をリストの先頭に追加
     const newPost = response.data.post;
@@ -261,6 +332,10 @@ const createPost = async () => {
     followingPosts.value.unshift(newPost);
     
     newPostContent.value = '';
+    selectedImage.value = null;
+    imagePreview.value = null;
+    const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   } catch (e: any) {
     console.error('Failed to create post:', e);
     console.error('Error response:', e.response?.data);
@@ -269,6 +344,53 @@ const createPost = async () => {
   } finally {
     posting.value = false;
   }
+};
+
+// 画像選択ハンドラー
+const handleImageSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  
+  if (file) {
+    selectedImage.value = file;
+    
+    // プレビュー用のURLを作成
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imagePreview.value = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+// 画像削除ハンドラー
+const removeImage = () => {
+  if (imagePreview.value) {
+    URL.revokeObjectURL(imagePreview.value);
+  }
+  selectedImage.value = null;
+  imagePreview.value = null;
+  const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+  if (fileInput) fileInput.value = '';
+};
+
+// Escapeキーでモーダルを閉じるハンドラー
+const handleModalKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    closeImageModal();
+  }
+};
+// 画像モーダル表示
+const openImageModal = (imageUrl: string) => {
+  modalImageUrl.value = imageUrl;
+  showImageModal.value = true;
+  document.addEventListener('keydown', handleModalKeydown);
+};
+// 画像モーダル閉じる
+const closeImageModal = () => {
+  showImageModal.value = false;
+  modalImageUrl.value = null;
+  document.removeEventListener('keydown', handleModalKeydown);
 };
 
 // 表示する投稿を計算
@@ -316,5 +438,14 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* カスタムスタイルが必要な場合はここに追加 */
+/* モーダルアニメーション */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
 </style>
