@@ -88,6 +88,7 @@
               <button 
                 @click="removeImage"
                 class="absolute top-2 right-2 bg-gray-900 bg-opacity-75 text-white rounded-full p-2 hover:bg-opacity-90"
+                aria-label="画像を削除"
               >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -104,7 +105,7 @@
                   class="hidden"
                   @change="handleImageSelect"
                 />
-                <label for="image-upload" class="p-2 hover:bg-blue-50 rounded-full cursor-pointer">
+                <label for="image-upload" class="p-2 hover:bg-blue-50 rounded-full cursor-pointer" aria-label="画像を選択">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                   </svg>
@@ -156,7 +157,7 @@
               
               <!-- 投稿画像 -->
               <div v-if="post.image_url" class="mt-3 rounded-2xl overflow-hidden border border-gray-200 cursor-pointer" @click="openImageModal(post.image_url)">
-                <img :src="post.image_url" :alt="post.content" class="w-full max-h-96 object-cover hover:opacity-95 transition" />
+                <img :src="post.image_url" alt="投稿画像" class="w-full max-h-96 object-cover hover:opacity-95 transition" />
               </div>
               
               <div class="flex justify-between mt-3 max-w-md text-gray-500">
@@ -200,12 +201,16 @@
       <Transition name="modal">
         <div 
           v-if="showImageModal" 
+          role="dialog"
+          aria-modal="true"
+          aria-label="画像拡大表示"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4"
           @click="closeImageModal"
         >
           <button 
             class="absolute top-4 right-4 text-white hover:text-gray-300 transition"
             @click="closeImageModal"
+            aria-label="モーダルを閉じる"
           >
             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -315,13 +320,11 @@ const createPost = async () => {
     
     const formData = new FormData();
     formData.append('content', newPostContent.value);
-    formData.append('image', selectedImage.value);
+    if (selectedImage.value) {
+      formData.append('image', selectedImage.value);
+    }
     
-    const response = await api.post('/posts', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await api.post('/posts', formData);
     
     // 投稿をリストの先頭に追加
     const newPost = response.data.post;
@@ -331,6 +334,8 @@ const createPost = async () => {
     newPostContent.value = '';
     selectedImage.value = null;
     imagePreview.value = null;
+    const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   } catch (e: any) {
     console.error('Failed to create post:', e);
     console.error('Error response:', e.response?.data);
@@ -360,20 +365,32 @@ const handleImageSelect = (event: Event) => {
 
 // 画像削除ハンドラー
 const removeImage = () => {
+  if (imagePreview.value) {
+    URL.revokeObjectURL(imagePreview.value);
+  }
   selectedImage.value = null;
   imagePreview.value = null;
+  const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+  if (fileInput) fileInput.value = '';
 };
 
+// Escapeキーでモーダルを閉じるハンドラー
+const handleModalKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    closeImageModal();
+  }
+};
 // 画像モーダル表示
 const openImageModal = (imageUrl: string) => {
   modalImageUrl.value = imageUrl;
   showImageModal.value = true;
+  document.addEventListener('keydown', handleModalKeydown);
 };
-
 // 画像モーダル閉じる
 const closeImageModal = () => {
   showImageModal.value = false;
   modalImageUrl.value = null;
+  document.removeEventListener('keydown', handleModalKeydown);
 };
 
 // 表示する投稿を計算

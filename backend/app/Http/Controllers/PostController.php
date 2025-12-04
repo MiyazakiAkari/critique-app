@@ -77,20 +77,33 @@ class PostController extends Controller
     {
         $validated = $request->validate([
             'content' => 'required|string|max:500',
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240', // 10MB
+             'image' => [
+                'required',
+                'image',
+                'mimes:jpeg,png,jpg,gif',
+                'max:10240', // 10MB
+                function ($attribute, $value, $fail) {
+                    if ($value && !@getimagesize($value->getRealPath())) {
+                        $fail('The file must be a valid image.');
+                    }
+                },
+            ],
         ]);
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
         
         // 画像を保存
-        $imagePath = $request->file('image')->store('posts', 'public');
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('posts', 'public');
+        }
         
-        $post = Post::create([
-            'user_id' => $user->id,
-            'content' => $validated['content'],
-            'image_path' => $imagePath,
-        ]);
+        $post = new Post();
+        $post->user_id = $user->id;
+        $post->content = $validated['content'];
+        $post->image_path = $imagePath;
+        $post->save();
 
         $post->load('user:id,name,username');
 
@@ -100,7 +113,7 @@ class PostController extends Controller
                 'id' => $post->id,
                 'content' => $post->content,
                 'image_path' => $post->image_path,
-                'image_url' => asset('storage/' . $post->image_path),
+                'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
                 'created_at' => $post->created_at->toISOString(),
                 'user' => $post->user->only(['id', 'name', 'username']),
             ],
