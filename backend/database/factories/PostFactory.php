@@ -23,6 +23,17 @@ class PostFactory extends Factory
         return [
             'user_id' => User::factory(),
             'content' => fake()->realText(200),
+            'image_path' => null, // デフォルトは画像なし
         ];
+    }
+
+    /**
+     * 画像付きの投稿を作成
+     */
+    public function withImage(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'image_path' => 'posts/test-image.jpg', // テスト用のダミーパス
+        ]);
     }
 }

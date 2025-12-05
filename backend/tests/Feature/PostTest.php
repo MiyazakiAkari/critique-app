@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PostTest extends TestCase
@@ -34,9 +36,14 @@ class PostTest extends TestCase
     /** @test */
     public function it_can_create_a_post()
     {
+        Storage::fake('public');
+        
+        $image = UploadedFile::fake()->create('test.jpg', 100, 'image/jpeg');
+
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/posts', [
                 'content' => 'This is a test post',
+                'image' => $image,
             ]);
 
         $response->assertStatus(201)
@@ -262,4 +269,190 @@ class PostTest extends TestCase
 
         $response->assertStatus(401);
     }
+
+    /** @test */
+    public function it_requires_image_when_creating_post()
+    {
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/posts', [
+                'content' => 'Post without image',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['image']);
+    }
+
+    /** @test */
+    public function it_validates_image_file_type()
+    {
+        Storage::fake('public');
+
+        $invalidFile = UploadedFile::fake()->create('document.pdf', 100);
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/posts', [
+                'content' => 'Post with invalid file',
+                'image' => $invalidFile,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['image']);
+    }
+
+    /** @test */
+    public function it_validates_image_file_size()
+    {
+        Storage::fake('public');
+
+        // 10MBを超える画像
+        $largeImage = UploadedFile::fake()->create('large.jpg', 11000, 'image/jpeg');
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/posts', [
+                'content' => 'Post with large image',
+                'image' => $largeImage,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['image']);
+    }
+
+    /** @test */
+    public function it_returns_image_url_in_timeline()
+    {
+        Storage::fake('public');
+
+        $image = UploadedFile::fake()->create('timeline-test.jpg', 100, 'image/jpeg');
+
+        // 画像付き投稿を作成
+        $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/posts', [
+                'content' => 'Timeline post with image',
+                'image' => $image,
+            ]);
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->getJson('/api/posts/timeline');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'posts' => [
+                    '*' => [
+                        'id',
+                        'content',
+                        'image_path',
+                        'image_url',
+                        'created_at',
+                        'user',
+                    ],
+                ],
+            ]);
+
+        $posts = $response->json('posts');
+        $this->assertNotEmpty($posts);
+        $this->assertNotNull($posts[0]['image_url']);
+        $this->assertStringContainsString('storage/posts/', $posts[0]['image_url']);
+    }
+
+    /** @test */
+    public function it_returns_image_url_in_recommended_posts()
+    {
+        Storage::fake('public');
+
+        $image = UploadedFile::fake()->create('recommended-test.jpg', 100, 'image/jpeg');
+
+        // 画像付き投稿を作成
+        $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/posts', [
+                'content' => 'Recommended post with image',
+                'image' => $image,
+            ]);
+
+        $response = $this->getJson('/api/posts/recommended');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'posts' => [
+                    '*' => [
+                        'id',
+                        'content',
+                        'image_path',
+                        'image_url',
+                        'created_at',
+                        'user',
+                    ],
+                ],
+            ]);
+
+        $posts = $response->json('posts');
+        $this->assertNotEmpty($posts);
+        $this->assertNotNull($posts[0]['image_url']);
+    }
+
+    /** @test */
+    public function it_returns_image_url_in_single_post()
+    {
+        Storage::fake('public');
+
+        $image = UploadedFile::fake()->create('single-post-test.jpg', 100, 'image/jpeg');
+
+        // 画像付き投稿を作成
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/posts', [
+                'content' => 'Single post with image',
+                'image' => $image,
+            ]);
+
+        $postId = $response->json('post.id');
+
+        $response = $this->getJson("/api/posts/{$postId}");
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'post' => [
+                    'id',
+                    'content',
+                    'image_path',
+                    'image_url',
+                    'created_at',
+                    'user',
+                ],
+            ]);
+
+        $post = $response->json('post');
+        $this->assertNotNull($post['image_url']);
+        $this->assertStringContainsString('storage/posts/', $post['image_url']);
+    }
+
+    /** @test */
+    public function it_accepts_various_image_formats()
+    {
+        Storage::fake('public');
+
+        $formats = ['jpg', 'jpeg', 'png', 'gif'];
+        $mimeTypes = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+        ];
+
+        foreach ($formats as $format) {
+            $image = UploadedFile::fake()->create("test.{$format}", 100, $mimeTypes[$format]);
+
+            $response = $this->actingAs($this->user, 'sanctum')
+                ->postJson('/api/posts', [
+                    'content' => "Post with {$format} image",
+                    'image' => $image,
+                ]);
+
+            $response->assertStatus(201);
+
+            $post = Post::where('content', "Post with {$format} image")->first();
+            $this->assertNotNull($post);
+            $this->assertNotNull($post->image_path);
+            $this->assertTrue(Storage::disk('public')->exists($post->image_path));
+        }
+    }
 }
+
