@@ -88,6 +88,14 @@ class User extends Authenticatable
     }
 
     /**
+     * このユーザーの添削一覧
+     */
+    public function critiques(): HasMany
+    {
+        return $this->hasMany(Critique::class);
+    }
+
+    /**
      * Automatically create a profile when a user is created.
      */
     protected static function booted()

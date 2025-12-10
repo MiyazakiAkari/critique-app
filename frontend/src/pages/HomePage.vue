@@ -161,11 +161,14 @@
               </div>
               
               <div class="flex justify-between mt-3 max-w-md text-gray-500">
-                <button class="flex items-center space-x-2 hover:text-blue-500 group">
+                <button 
+                  @click="togglePostExpansion(post.id)"
+                  class="flex items-center space-x-2 hover:text-blue-500 group"
+                >
                   <svg class="w-5 h-5 group-hover:bg-blue-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                   </svg>
-                  <span class="text-sm">0</span>
+                  <span class="text-sm">{{ critiquesMap[post.id]?.length || 0 }}</span>
                 </button>
                 
                 <button class="flex items-center space-x-2 hover:text-green-500 group">
@@ -187,6 +190,73 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
                   </svg>
                 </button>
+              </div>
+              
+              <!-- 添削エリア（展開時） -->
+              <div v-if="expandedPosts.has(post.id)" class="mt-4 border-t border-gray-200 pt-4">
+                <!-- 添削一覧 -->
+                <div v-if="critiquesMap[post.id]?.length" class="space-y-3 mb-4">
+                  <div 
+                    v-for="critique in critiquesMap[post.id]" 
+                    :key="critique.id"
+                    class="flex space-x-2 pl-2 border-l-2 border-blue-200"
+                  >
+                    <div class="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0"></div>
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-2">
+                        <span class="font-semibold text-sm text-gray-900">{{ critique.user.name }}</span>
+                        <span class="text-gray-500 text-sm">@{{ critique.user.username }}</span>
+                        <span class="text-gray-500 text-sm">·</span>
+                        <span class="text-gray-500 text-sm">{{ formatRelativeTime(critique.created_at) }}</span>
+                        <button 
+                          v-if="authUser && authUser.id === critique.user.id"
+                          @click="deleteCritique(post.id, critique.id)"
+                          class="ml-auto text-red-500 hover:text-red-700 text-sm"
+                          title="削除"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                          </svg>
+                        </button>
+                      </div>
+                      <p class="mt-1 text-sm text-gray-800">{{ critique.content }}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div v-else class="text-center text-gray-400 text-sm mb-4 py-4">
+                  まだ添削がありません
+                </div>
+                
+                <!-- 添削フォーム -->
+                <div v-if="authUser" class="flex space-x-2">
+                  <div class="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0"></div>
+                  <div class="flex-1">
+                    <textarea 
+                      v-model="critiqueContent[post.id]"
+                      placeholder="添削を入力..."
+                      class="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-blue-500 resize-none"
+                      rows="2"
+                      maxlength="1000"
+                    ></textarea>
+                    <div class="flex justify-between items-center mt-2">
+                      <span class="text-xs text-gray-500">
+                        {{ critiqueContent[post.id]?.length || 0 }} / 1000
+                      </span>
+                      <button 
+                        @click="createCritique(post.id)"
+                        :disabled="!critiqueContent[post.id]?.trim() || submittingCritique[post.id]"
+                        class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {{ submittingCritique[post.id] ? '送信中...' : '添削する' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div v-else class="text-center text-gray-500 text-sm py-4">
+                  添削するにはログインしてください
+                </div>
               </div>
             </div>
           </div>
@@ -246,6 +316,17 @@ interface Post {
     username: string;
   };
 }
+
+interface Critique {
+  id: number;
+  content: string;
+  created_at: string;
+  user: {
+    id: number;
+    name: string;
+    username: string;
+  };
+}
 const router = useRouter();
 const activeTab = ref<'recommended' | 'following'>('recommended');
 // 投稿データ
@@ -263,6 +344,13 @@ const posting = ref(false);
 // 画像モーダル
 const showImageModal = ref(false);
 const modalImageUrl = ref<string | null>(null);
+
+// 添削機能
+const critiquesMap = ref<Record<number, Critique[]>>({});
+const expandedPosts = ref<Set<number>>(new Set());
+const critiqueContent = ref<Record<number, string>>({});
+const submittingCritique = ref<Record<number, boolean>>({});
+const authUser = ref<{ id: number; username: string } | null>(null);
 
 // プロフィールページへ遷移
 const goToProfile = () => {
@@ -421,6 +509,73 @@ const formatRelativeTime = (dateString: string) => {
   return date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
 };
 
+// 添削を取得
+const fetchCritiques = async (postId: number) => {
+  try {
+    const response = await api.get(`/posts/${postId}/critiques`);
+    critiquesMap.value[postId] = response.data;
+  } catch (e: any) {
+    console.error('Failed to fetch critiques:', e);
+  }
+};
+
+// 投稿の展開/折りたたみをトグル
+const togglePostExpansion = async (postId: number) => {
+  if (expandedPosts.value.has(postId)) {
+    expandedPosts.value.delete(postId);
+  } else {
+    expandedPosts.value.add(postId);
+    // まだ添削を取得していない場合は取得
+    if (!critiquesMap.value[postId]) {
+      await fetchCritiques(postId);
+    }
+  }
+};
+
+// 添削を作成
+const createCritique = async (postId: number) => {
+  const content = critiqueContent.value[postId]?.trim();
+  if (!content) return;
+  
+  try {
+    submittingCritique.value[postId] = true;
+    const response = await api.post(`/posts/${postId}/critiques`, { content });
+    
+    // 添削リストを更新
+    if (!critiquesMap.value[postId]) {
+      critiquesMap.value[postId] = [];
+    }
+    critiquesMap.value[postId].push(response.data);
+    
+    // フォームをクリア
+    critiqueContent.value[postId] = '';
+  } catch (e: any) {
+    console.error('Failed to create critique:', e);
+    error.value = e.response?.data?.message || '添削の投稿に失敗しました';
+  } finally {
+    submittingCritique.value[postId] = false;
+  }
+};
+
+// 添削を削除
+const deleteCritique = async (postId: number, critiqueId: number) => {
+  if (!confirm('この添削を削除しますか?')) return;
+  
+  try {
+    await api.delete(`/posts/${postId}/critiques/${critiqueId}`);
+    
+    // 添削リストから削除
+    if (critiquesMap.value[postId]) {
+      critiquesMap.value[postId] = critiquesMap.value[postId].filter(
+        c => c.id !== critiqueId
+      );
+    }
+  } catch (e: any) {
+    console.error('Failed to delete critique:', e);
+    error.value = e.response?.data?.message || '添削の削除に失敗しました';
+  }
+};
+
 // タブ切り替え時にデータを取得
 const handleTabChange = async (tab: 'recommended' | 'following') => {
   activeTab.value = tab;
@@ -433,6 +588,11 @@ const handleTabChange = async (tab: 'recommended' | 'following') => {
 
 // 初回マウント時にデータを取得
 onMounted(async () => {
+  // 認証ユーザー情報を取得
+  const userStr = localStorage.getItem('auth_user');
+  if (userStr) {
+    authUser.value = JSON.parse(userStr);
+  }
   await fetchRecommendedPosts();
 });
 </script>

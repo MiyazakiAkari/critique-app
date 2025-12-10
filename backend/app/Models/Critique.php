@@ -5,9 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Post extends Model
+class Critique extends Model
 {
     use HasFactory;
 
@@ -22,18 +21,18 @@ class Post extends Model
     ];
 
     /**
-     * 投稿の作成者
+     * 添削が属する投稿
+     */
+    public function post(): BelongsTo
+    {
+        return $this->belongsTo(Post::class);
+    }
+
+    /**
+     * 添削の作成者
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    /**
-     * 投稿への添削一覧
-     */
-    public function critiques(): HasMany
-    {
-        return $this->hasMany(Critique::class);
     }
 }
