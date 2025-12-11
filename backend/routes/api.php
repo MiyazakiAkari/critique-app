@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CritiqueController;
 use App\Http\Controllers\FollowController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\LogoutController;
@@ -50,3 +51,12 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::get('/posts/{post}', [PostController::class, 'show']);
+
+// 添削関連（閲覧は認証不要）
+Route::get('/posts/{post}/critiques', [CritiqueController::class, 'index']);
+
+// 添削操作（認証必須）
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/posts/{post}/critiques', [CritiqueController::class, 'store']);
+    Route::delete('/posts/{post}/critiques/{critique}', [CritiqueController::class, 'destroy']);
+});
