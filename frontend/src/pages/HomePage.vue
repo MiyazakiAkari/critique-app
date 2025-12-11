@@ -153,7 +153,7 @@
                 <span class="text-gray-500">·</span>
                 <span class="text-gray-500">{{ formatRelativeTime(post.created_at) }}</span>
               </div>
-              <p class="mt-1 text-gray-800">{{ post.content }}</p>
+              <p class="mt-1 text-gray-800 whitespace-pre-wrap">{{ post.content }}</p>
               
               <!-- 投稿画像 -->
               <div v-if="post.image_url" class="mt-3 rounded-2xl overflow-hidden border border-gray-200 cursor-pointer" @click="openImageModal(post.image_url)">
@@ -208,18 +208,40 @@
                         <span class="text-gray-500 text-sm">@{{ critique.user.username }}</span>
                         <span class="text-gray-500 text-sm">·</span>
                         <span class="text-gray-500 text-sm">{{ formatRelativeTime(critique.created_at) }}</span>
-                        <button 
-                          v-if="authUser && authUser.id === critique.user.id"
-                          @click="deleteCritique(post.id, critique.id)"
-                          class="ml-auto text-red-500 hover:text-red-700 text-sm"
-                          title="削除"
-                        >
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                          </svg>
-                        </button>
+                        
+                        <!-- 三点リーダーメニュー -->
+                        <div v-if="authUser && authUser.id === critique.user.id" class="ml-auto relative">
+                          <button 
+                            @click.stop="toggleCritiqueMenu(critique.id)"
+                            class="text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full p-1 transition"
+                            title="メニュー"
+                          >
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+                            </svg>
+                          </button>
+                          
+                          <!-- ドロップダウンメニュー -->
+                          <Transition name="dropdown">
+                            <div 
+                              v-if="openCritiqueMenuId === critique.id"
+                              class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20"
+                              @click.stop
+                            >
+                              <button 
+                                @click="deleteCritique(post.id, critique.id)"
+                                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                              >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                                <span>添削を削除</span>
+                              </button>
+                            </div>
+                          </Transition>
+                        </div>
                       </div>
-                      <p class="mt-1 text-sm text-gray-800">{{ critique.content }}</p>
+                      <p class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">{{ critique.content }}</p>
                     </div>
                   </div>
                 </div>
@@ -236,7 +258,7 @@
                       v-model="critiqueContent[post.id]"
                       placeholder="添削を入力..."
                       class="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-blue-500 resize-none"
-                      rows="2"
+                      rows="10"
                       maxlength="1000"
                     ></textarea>
                     <div class="flex justify-between items-center mt-2">
@@ -296,11 +318,56 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- 削除確認モーダル -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div 
+          v-if="showDeleteConfirm" 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-modal-title"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+          @click="cancelDelete"
+        >
+          <div 
+            class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 transform transition-all"
+            @click.stop
+          >
+            <div class="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+            </div>
+            <h3 id="delete-modal-title" class="text-lg font-semibold text-gray-900 text-center mb-2">
+              添削を削除しますか？
+            </h3>
+            <p class="text-sm text-gray-600 text-center mb-6">
+              この操作は取り消せません。本当に削除してもよろしいですか？
+            </p>
+            <div class="flex space-x-3">
+              <button 
+                @click="cancelDelete"
+                class="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition focus:outline-none focus:ring-2 focus:ring-gray-300"
+              >
+                キャンセル
+              </button>
+              <button 
+                @click="confirmDelete"
+                class="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                削除
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../utils/axios';
 
@@ -345,12 +412,17 @@ const posting = ref(false);
 const showImageModal = ref(false);
 const modalImageUrl = ref<string | null>(null);
 
+// 削除確認モーダル
+const showDeleteConfirm = ref(false);
+const deleteTarget = ref<{ postId: number; critiqueId: number } | null>(null);
+
 // 添削機能
 const critiquesMap = ref<Record<number, Critique[]>>({});
 const expandedPosts = ref<Set<number>>(new Set());
 const critiqueContent = ref<Record<number, string>>({});
 const submittingCritique = ref<Record<number, boolean>>({});
-const authUser = ref<{ id: number; username: string } | null>(null);
+const openCritiqueMenuId = ref<number | null>(null);
+const authUser = ref<{ id: number; name: string; username: string } | null>(null);
 
 // プロフィールページへ遷移
 const goToProfile = () => {
@@ -521,15 +593,17 @@ const fetchCritiques = async (postId: number) => {
 
 // 投稿の展開/折りたたみをトグル
 const togglePostExpansion = async (postId: number) => {
-  if (expandedPosts.value.has(postId)) {
-    expandedPosts.value.delete(postId);
+  const newSet = new Set(expandedPosts.value);
+  if (newSet.has(postId)) {
+    newSet.delete(postId);
   } else {
-    expandedPosts.value.add(postId);
+    newSet.add(postId);
     // まだ添削を取得していない場合は取得
     if (!critiquesMap.value[postId]) {
       await fetchCritiques(postId);
     }
   }
+  expandedPosts.value = newSet;
 };
 
 // 添削を作成
@@ -557,9 +631,33 @@ const createCritique = async (postId: number) => {
   }
 };
 
-// 添削を削除
-const deleteCritique = async (postId: number, critiqueId: number) => {
-  if (!confirm('この添削を削除しますか?')) return;
+// 添削メニューのトグル
+const toggleCritiqueMenu = (critiqueId: number) => {
+  if (openCritiqueMenuId.value === critiqueId) {
+    openCritiqueMenuId.value = null;
+  } else {
+    openCritiqueMenuId.value = critiqueId;
+  }
+};
+
+// 添削を削除（モーダル表示）
+const deleteCritique = (postId: number, critiqueId: number) => {
+  openCritiqueMenuId.value = null; // メニューを閉じる
+  deleteTarget.value = { postId, critiqueId };
+  showDeleteConfirm.value = true;
+};
+
+// 削除確認モーダルのキャンセル
+const cancelDelete = () => {
+  showDeleteConfirm.value = false;
+  deleteTarget.value = null;
+};
+
+// 削除確認モーダルの確定
+const confirmDelete = async () => {
+  if (!deleteTarget.value) return;
+  
+  const { postId, critiqueId } = deleteTarget.value;
   
   try {
     await api.delete(`/posts/${postId}/critiques/${critiqueId}`);
@@ -570,9 +668,15 @@ const deleteCritique = async (postId: number, critiqueId: number) => {
         c => c.id !== critiqueId
       );
     }
+    
+    // モーダルを閉じる
+    showDeleteConfirm.value = false;
+    deleteTarget.value = null;
   } catch (e: any) {
     console.error('Failed to delete critique:', e);
     error.value = e.response?.data?.message || '添削の削除に失敗しました';
+    showDeleteConfirm.value = false;
+    deleteTarget.value = null;
   }
 };
 
@@ -586,6 +690,14 @@ const handleTabChange = async (tab: 'recommended' | 'following') => {
   }
 };
 
+// 外部クリックでメニューを閉じる
+const closeMenuOnOutsideClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.relative')) {
+    openCritiqueMenuId.value = null;
+  }
+};
+
 // 初回マウント時にデータを取得
 onMounted(async () => {
   // 認証ユーザー情報を取得
@@ -594,6 +706,14 @@ onMounted(async () => {
     authUser.value = JSON.parse(userStr);
   }
   await fetchRecommendedPosts();
+  
+  // 外部クリックリスナーを登録
+  document.addEventListener('click', closeMenuOnOutsideClick);
+});
+
+// クリーンアップ
+onUnmounted(() => {
+  document.removeEventListener('click', closeMenuOnOutsideClick);
 });
 </script>
 
@@ -607,5 +727,24 @@ onMounted(async () => {
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+/* ドロップダウンメニューアニメーション */
+.dropdown-enter-active {
+  transition: all 0.15s ease-out;
+}
+
+.dropdown-leave-active {
+  transition: all 0.1s ease-in;
+}
+
+.dropdown-enter-from {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+}
+
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

@@ -43,11 +43,10 @@ class CritiqueController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $critique = new Critique();
-        $critique->post_id = $post->id;
-        $critique->user_id = $user->id;
-        $critique->content = $validated['content'];
-        $critique->save();
+        $critique = $post->critiques()->create([
+            'user_id' => $user->id,
+            'content' => $validated['content'],
+        ]);
 
         $critique->load('user:id,name,username');
 

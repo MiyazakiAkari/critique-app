@@ -74,7 +74,7 @@ class CritiqueTest extends TestCase
         $user = User::factory()->create();
         $post = Post::factory()->create();
 
-        $response = $this->actingAs($user, 'web')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson("/api/posts/{$post->id}/critiques", [
                 'content' => 'This is my critique',
             ]);
@@ -112,7 +112,7 @@ class CritiqueTest extends TestCase
         $user = User::factory()->create();
         $post = Post::factory()->create();
 
-        $response = $this->actingAs($user, 'web')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson("/api/posts/{$post->id}/critiques", [
                 'content' => '',
             ]);
@@ -129,7 +129,7 @@ class CritiqueTest extends TestCase
         $user = User::factory()->create();
         $post = Post::factory()->create();
 
-        $response = $this->actingAs($user, 'web')
+        $response = $this->actingAs($user, 'sanctum')
             ->postJson("/api/posts/{$post->id}/critiques", [
                 'content' => str_repeat('a', 1001),
             ]);
@@ -150,7 +150,7 @@ class CritiqueTest extends TestCase
             'user_id' => $user->id,
         ]);
 
-        $response = $this->actingAs($user, 'web')
+        $response = $this->actingAs($user, 'sanctum')
             ->deleteJson("/api/posts/{$post->id}/critiques/{$critique->id}");
 
         $response->assertStatus(204);
@@ -172,7 +172,7 @@ class CritiqueTest extends TestCase
             'user_id' => $otherUser->id,
         ]);
 
-        $response = $this->actingAs($user, 'web')
+        $response = $this->actingAs($user, 'sanctum')
             ->deleteJson("/api/posts/{$post->id}/critiques/{$critique->id}");
 
         $response->assertStatus(403);
@@ -194,7 +194,7 @@ class CritiqueTest extends TestCase
             'user_id' => $critiqueAuthor->id,
         ]);
 
-        $response = $this->actingAs($postOwner, 'web')
+        $response = $this->actingAs($postOwner, 'sanctum')
             ->deleteJson("/api/posts/{$post->id}/critiques/{$critique->id}");
 
         $response->assertStatus(403);
