@@ -147,11 +147,51 @@
           <div class="flex space-x-3">
             <div class="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
             <div class="flex-1">
-              <div class="flex items-center space-x-2">
-                <span class="font-semibold text-gray-900">{{ post.user.name }}</span>
-                <span class="text-gray-500">@{{ post.user.username }}</span>
-                <span class="text-gray-500">·</span>
-                <span class="text-gray-500">{{ formatRelativeTime(post.created_at) }}</span>
+              <div class="flex items-center space-x-2 justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="font-semibold text-gray-900">{{ post.user.name }}</span>
+                  <span class="text-gray-500">@{{ post.user.username }}</span>
+                  <span class="text-gray-500">·</span>
+                  <span class="text-gray-500">{{ formatRelativeTime(post.created_at) }}</span>
+                </div>
+                
+                <!-- 投稿三点リーダーメニュー -->
+                <div v-if="authUser && authUser.id === post.user.id" class="relative">
+                  <button 
+                    @click.stop="togglePostMenu(post.id)"
+                    class="text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full p-1 transition"
+                    title="メニュー"
+                    aria-label="投稿メニューを開く"
+                    :aria-expanded="openPostMenuId === post.id"
+                  >
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+                    </svg>
+                  </button>
+                  
+                  <!-- ドロップダウンメニュー -->
+                  <Transition name="dropdown">
+                    <div 
+                      v-if="openPostMenuId === post.id"
+                      class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20"
+                      role="menu"
+                      @click.stop
+                      @keydown.esc="togglePostMenu(post.id)"
+                    >
+                      <button 
+                        @click="deletePost(post.id)"
+                        @keydown.enter="deletePost(post.id)"
+                        class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                        role="menuitem"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        <span>投稿を削除</span>
+                      </button>
+                    </div>
+                  </Transition>
+                </div>
               </div>
               <p class="mt-1 text-gray-800 whitespace-pre-wrap">{{ post.content }}</p>
               
@@ -215,6 +255,8 @@
                             @click.stop="toggleCritiqueMenu(critique.id)"
                             class="text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full p-1 transition"
                             title="メニュー"
+                            aria-label="添削メニューを開く"
+                            :aria-expanded="openCritiqueMenuId === critique.id"
                           >
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
@@ -226,11 +268,15 @@
                             <div 
                               v-if="openCritiqueMenuId === critique.id"
                               class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20"
+                              role="menu"
                               @click.stop
+                              @keydown.esc="toggleCritiqueMenu(critique.id)"
                             >
                               <button 
                                 @click="deleteCritique(post.id, critique.id)"
+                                @keydown.enter="deleteCritique(post.id, critique.id)"
                                 class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                                role="menuitem"
                               >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -340,7 +386,7 @@
               </svg>
             </div>
             <h3 id="delete-modal-title" class="text-lg font-semibold text-gray-900 text-center mb-2">
-              添削を削除しますか？
+              {{ deleteTarget?.type === 'post' ? '投稿を削除しますか？' : '添削を削除しますか？' }}
             </h3>
             <p class="text-sm text-gray-600 text-center mb-6">
               この操作は取り消せません。本当に削除してもよろしいですか？
@@ -412,9 +458,14 @@ const posting = ref(false);
 const showImageModal = ref(false);
 const modalImageUrl = ref<string | null>(null);
 
+// 削除対象の型定義（Discriminated Union）
+type DeleteTarget = 
+  | { type: 'post'; postId: number }
+  | { type: 'critique'; postId: number; critiqueId: number };
+
 // 削除確認モーダル
 const showDeleteConfirm = ref(false);
-const deleteTarget = ref<{ postId: number; critiqueId: number } | null>(null);
+const deleteTarget = ref<DeleteTarget | null>(null);
 
 // 添削機能
 const critiquesMap = ref<Record<number, Critique[]>>({});
@@ -422,6 +473,7 @@ const expandedPosts = ref<Set<number>>(new Set());
 const critiqueContent = ref<Record<number, string>>({});
 const submittingCritique = ref<Record<number, boolean>>({});
 const openCritiqueMenuId = ref<number | null>(null);
+const openPostMenuId = ref<number | null>(null);
 const authUser = ref<{ id: number; name: string; username: string } | null>(null);
 
 // プロフィールページへ遷移
@@ -643,7 +695,7 @@ const toggleCritiqueMenu = (critiqueId: number) => {
 // 添削を削除（モーダル表示）
 const deleteCritique = (postId: number, critiqueId: number) => {
   openCritiqueMenuId.value = null; // メニューを閉じる
-  deleteTarget.value = { postId, critiqueId };
+  deleteTarget.value = { type: 'critique', postId, critiqueId };
   showDeleteConfirm.value = true;
 };
 
@@ -657,24 +709,37 @@ const cancelDelete = () => {
 const confirmDelete = async () => {
   if (!deleteTarget.value) return;
   
-  const { postId, critiqueId } = deleteTarget.value;
+  // ローカル変数に値を保存して型狭窄を保持
+  const target = deleteTarget.value;
   
   try {
-    await api.delete(`/posts/${postId}/critiques/${critiqueId}`);
-    
-    // 添削リストから削除
-    if (critiquesMap.value[postId]) {
-      critiquesMap.value[postId] = critiquesMap.value[postId].filter(
-        c => c.id !== critiqueId
-      );
+    if (target.type === 'post') {
+      // 投稿削除
+      const postId = target.postId;
+      await api.delete(`/posts/${postId}`);
+      
+      // 投稿リストから削除
+      recommendedPosts.value = recommendedPosts.value.filter(p => p.id !== postId);
+      followingPosts.value = followingPosts.value.filter(p => p.id !== postId);
+    } else if (target.type === 'critique') {
+      // 添削削除
+      const { postId, critiqueId } = target;
+      await api.delete(`/posts/${postId}/critiques/${critiqueId}`);
+      
+      // 添削リストから削除
+      if (critiquesMap.value[postId]) {
+        critiquesMap.value[postId] = critiquesMap.value[postId].filter(
+          c => c.id !== critiqueId
+        );
+      }
     }
     
     // モーダルを閉じる
     showDeleteConfirm.value = false;
     deleteTarget.value = null;
   } catch (e: any) {
-    console.error('Failed to delete critique:', e);
-    error.value = e.response?.data?.message || '添削の削除に失敗しました';
+    console.error('Failed to delete:', e);
+    error.value = e.response?.data?.message || '削除に失敗しました';
     showDeleteConfirm.value = false;
     deleteTarget.value = null;
   }
@@ -690,10 +755,27 @@ const handleTabChange = async (tab: 'recommended' | 'following') => {
   }
 };
 
+// 投稿メニューのトグル
+const togglePostMenu = (postId: number) => {
+  if (openPostMenuId.value === postId) {
+    openPostMenuId.value = null;
+  } else {
+    openPostMenuId.value = postId;
+  }
+};
+
+// 投稿を削除（モーダル表示）
+const deletePost = (postId: number) => {
+  openPostMenuId.value = null; // メニューを閉じる
+  deleteTarget.value = { type: 'post', postId };
+  showDeleteConfirm.value = true;
+};
+
 // 外部クリックでメニューを閉じる
 const closeMenuOnOutsideClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement;
   if (!target.closest('.relative')) {
+    openPostMenuId.value = null;
     openCritiqueMenuId.value = null;
   }
 };
