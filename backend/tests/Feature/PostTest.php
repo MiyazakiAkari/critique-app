@@ -56,6 +56,8 @@ class PostTest extends TestCase
                         'name' => 'Test User',
                         'username' => 'testuser',
                     ],
+                    'reposts_count' => 0,
+                    'is_reposted' => false,
                 ],
             ]);
 

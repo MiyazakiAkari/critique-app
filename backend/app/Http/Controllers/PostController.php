@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Post;
+use App\Models\Repost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 class PostController extends Controller
 {
     /**
-     * タイムライン取得（フォロー中のユーザーの投稿）
+     * タイムライン取得（フォロー中のユーザーの投稿とリポスト）
      */
     public function timeline(): JsonResponse
     {
@@ -18,30 +19,49 @@ class PostController extends Controller
         $user = Auth::user();
         
         // フォロー中のユーザーIDを取得
-        $followingIds = $user->followings()->pluck('users.id');
+        $followingIds = $user->followings()->pluck('users.id')->toArray();
         
-        // 自分の投稿も含める
-        $followingIds->push($user->id);
+        // 自分のIDも含める
+        $followingIds[] = $user->id;
         
-        // フォロー中のユーザーの投稿を新しい順に取得
-        $posts = Post::whereIn('user_id', $followingIds)
+        // フォロー中のユーザーの直接投稿を取得
+        $directPosts = Post::whereIn('user_id', $followingIds)
             ->with('user:id,name,username')
-            ->orderBy('created_at', 'desc')
-            ->limit(50)
             ->get()
             ->map(function ($post) {
-                return [
-                    'id' => $post->id,
-                    'content' => $post->content,
-                    'image_path' => $post->image_path,
-                    'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
-                    'created_at' => $post->created_at->toISOString(),
-                    'user' => $post->user->only(['id', 'name', 'username']),
-                ];
+                $post->display_at = $post->created_at;
+                return $post;
             });
+        
+        // フォロー中のユーザーのリポスト投稿を取得
+        $repostedPosts = Repost::whereIn('user_id', $followingIds)
+            ->with('post.user:id,name,username')
+            ->get()
+            ->map(function ($repost) {
+                $post = $repost->post;
+                $post->display_at = $repost->created_at;
+                return $post;
+            });
+        
+        // 両方を結合してから、投稿IDでグループ化して重複を排除
+        $allPosts = collect($directPosts)->concat(collect($repostedPosts))
+            ->groupBy('id')
+            ->map(function ($group) {
+                // 同じ投稿IDの場合は、最新の表示時刻を保持
+                return $group->sortByDesc('display_at')->first();
+            })
+            ->sortByDesc('display_at')
+            ->take(50);
+        
+        // フォーマットして返す
+        $formattedPosts = $allPosts
+            ->map(function ($post) use ($user) {
+                return $this->formatPost($post, $user);
+            })
+            ->values();
 
         return response()->json([
-            'posts' => $posts,
+            'posts' => $formattedPosts,
         ], 200);
     }
 
@@ -50,19 +70,15 @@ class PostController extends Controller
      */
     public function recommended(): JsonResponse
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
         $posts = Post::with('user:id,name,username')
             ->orderBy('created_at', 'desc')
             ->limit(50)
             ->get()
-            ->map(function ($post) {
-                return [
-                    'id' => $post->id,
-                    'content' => $post->content,
-                    'image_path' => $post->image_path,
-                    'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
-                    'created_at' => $post->created_at->toISOString(),
-                    'user' => $post->user->only(['id', 'name', 'username']),
-                ];
+            ->map(function ($post) use ($user) {
+                return $this->formatPost($post, $user);
             });
 
         return response()->json([
@@ -115,14 +131,7 @@ class PostController extends Controller
 
         return response()->json([
             'message' => '投稿しました',
-            'post' => [
-                'id' => $post->id,
-                'content' => $post->content,
-                'image_path' => $post->image_path,
-                'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
-                'created_at' => $post->created_at->toISOString(),
-                'user' => $post->user->only(['id', 'name', 'username']),
-            ],
+            'post' => $this->formatPost($post, $user),
         ], 201);
     }
 
@@ -132,16 +141,12 @@ class PostController extends Controller
     public function show(Post $post): JsonResponse
     {
         $post->load('user:id,name,username');
+        
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
 
         return response()->json([
-            'post' => [
-                'id' => $post->id,
-                'content' => $post->content,
-                'image_path' => $post->image_path,
-                'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
-                'created_at' => $post->created_at->toISOString(),
-                'user' => $post->user->only(['id', 'name', 'username']),
-            ],
+            'post' => $this->formatPost($post, $user),
         ], 200);
     }
 
@@ -174,23 +179,102 @@ class PostController extends Controller
     {
         $user = \App\Models\User::where('username', $username)->firstOrFail();
         
+        /** @var \App\Models\User $currentUser */
+        $currentUser = Auth::user();
+
         $posts = Post::where('user_id', $user->id)
             ->with('user:id,name,username')
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($post) {
-                return [
-                    'id' => $post->id,
-                    'content' => $post->content,
-                    'image_path' => $post->image_path,
-                    'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
-                    'created_at' => $post->created_at->toISOString(),
-                    'user' => $post->user->only(['id', 'name', 'username']),
-                ];
+            ->map(function ($post) use ($currentUser) {
+                return $this->formatPost($post, $currentUser);
             });
 
         return response()->json([
             'posts' => $posts,
         ], 200);
     }
+
+    /**
+     * 投稿をリポストする（既にリポストしている場合は取り消す）
+     */
+    public function repost(Post $post): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 既にリポストしているかチェック
+        $existingRepost = Repost::where('user_id', $user->id)
+            ->where('post_id', $post->id)
+            ->first();
+
+        if ($existingRepost) {
+            // 既にリポストしている場合は取り消す
+            $existingRepost->delete();
+            return response()->json([
+                'message' => 'リポストを取り消しました',
+            ], 200);
+        }
+
+        Repost::create([
+            'user_id' => $user->id,
+            'post_id' => $post->id,
+        ]);
+
+        return response()->json([
+            'message' => 'リポストしました',
+        ], 201);
+    }
+
+    /**
+     * リポストを取り消す
+     */
+    public function unrepost(Post $post): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $repost = Repost::where('user_id', $user->id)
+            ->where('post_id', $post->id)
+            ->first();
+
+        if (!$repost) {
+            return response()->json([
+                'message' => 'リポストしていません',
+            ], 404);
+        }
+
+        $repost->delete();
+
+        return response()->json([
+            'message' => 'リポストを取り消しました',
+        ], 200);
+    }
+
+    /**
+     * 投稿をフォーマットして返す
+     */
+    private function formatPost(Post $post, ?\App\Models\User $user = null): array
+    {
+        $isReposts = false;
+        $reposts_count = $post->reposts()->count();
+
+        if ($user) {
+            $isReposts = Repost::where('user_id', $user->id)
+                ->where('post_id', $post->id)
+                ->exists();
+        }
+
+        return [
+            'id' => $post->id,
+            'content' => $post->content,
+            'image_path' => $post->image_path,
+            'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
+            'created_at' => $post->created_at->toISOString(),
+            'user' => $post->user->only(['id', 'name', 'username']),
+            'reposts_count' => $reposts_count,
+            'is_reposted' => $isReposts,
+        ];
+    }
 }
+

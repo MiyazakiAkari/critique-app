@@ -5,9 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Post extends Model
+class Repost extends Model
 {
     use HasFactory;
 
@@ -18,11 +17,11 @@ class Post extends Model
      */
     protected $fillable = [
         'user_id',
-        'content',
+        'post_id',
     ];
 
     /**
-     * 投稿の作成者
+     * リポストしたユーザー
      */
     public function user(): BelongsTo
     {
@@ -30,18 +29,10 @@ class Post extends Model
     }
 
     /**
-     * 投稿への添削一覧
+     * リポストされた投稿
      */
-    public function critiques(): HasMany
+    public function post(): BelongsTo
     {
-        return $this->hasMany(Critique::class);
-    }
-
-    /**
-     * 投稿へのリポスト一覧
-     */
-    public function reposts(): HasMany
-    {
-        return $this->hasMany(Repost::class);
+        return $this->belongsTo(Post::class);
     }
 }

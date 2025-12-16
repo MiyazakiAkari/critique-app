@@ -211,11 +211,15 @@
                   <span class="text-sm">{{ critiquesMap[post.id]?.length || 0 }}</span>
                 </button>
                 
-                <button class="flex items-center space-x-2 hover:text-green-500 group">
+                <button 
+                  @click="toggleRepost(post.id, post)"
+                  :class="['flex items-center space-x-2 group', post.is_reposted ? 'text-green-500' : 'hover:text-green-500']"
+                  :disabled="repostingPostIds.has(post.id)"
+                >
                   <svg class="w-5 h-5 group-hover:bg-green-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                   </svg>
-                  <span class="text-sm">0</span>
+                  <span class="text-sm">{{ post.reposts_count || 0 }}</span>
                 </button>
                 
                 <button class="flex items-center space-x-2 hover:text-red-500 group">
@@ -365,6 +369,51 @@
       </Transition>
     </Teleport>
 
+    <!-- リポスト確認モーダル -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div 
+          v-if="showRepostConfirm" 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="repost-modal-title"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+          @click="showRepostConfirm = false"
+        >
+          <div 
+            class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 transform transition-all"
+            @click.stop
+          >
+            <div class="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-green-100 rounded-full">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h3 id="repost-modal-title" class="text-lg font-semibold text-gray-900 text-center mb-2">
+              リポストしますか？
+            </h3>
+            <p class="text-sm text-gray-600 text-center mb-6">
+              この投稿をリポストします。後でいつでも取り消せます。
+            </p>
+            <div class="flex space-x-3">
+              <button 
+                @click="showRepostConfirm = false"
+                class="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition focus:outline-none focus:ring-2 focus:ring-gray-300"
+              >
+                キャンセル
+              </button>
+              <button 
+                @click="confirmRepost"
+                class="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                リポスト
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- 削除確認モーダル -->
     <Teleport to="body">
       <Transition name="modal">
@@ -475,6 +524,12 @@ const submittingCritique = ref<Record<number, boolean>>({});
 const openCritiqueMenuId = ref<number | null>(null);
 const openPostMenuId = ref<number | null>(null);
 const authUser = ref<{ id: number; name: string; username: string } | null>(null);
+
+// リポスト機能
+const repostingPostIds = ref<Set<number>>(new Set());
+const showRepostConfirm = ref(false);
+const repostConfirmPostId = ref<number | null>(null);
+const repostConfirmPost = ref<any>(null);
 
 // プロフィールページへ遷移
 const goToProfile = () => {
@@ -769,6 +824,60 @@ const deletePost = (postId: number) => {
   openPostMenuId.value = null; // メニューを閉じる
   deleteTarget.value = { type: 'post', postId };
   showDeleteConfirm.value = true;
+};
+
+// リポスト/アンリポストをトグル
+const toggleRepost = async (postId: number, post: any) => {
+  if (post.is_reposted) {
+    // アンリポスト（確認なし）
+    await executeUnrepost(postId, post);
+  } else {
+    // リポスト（確認ダイアログを表示）
+    repostConfirmPostId.value = postId;
+    repostConfirmPost.value = post;
+    showRepostConfirm.value = true;
+  }
+};
+
+// リポストを確認して実行
+const confirmRepost = async () => {
+  if (repostConfirmPostId.value === null || repostConfirmPost.value === null) {
+    return;
+  }
+  
+  const postId = repostConfirmPostId.value;
+  const post = repostConfirmPost.value;
+  
+  showRepostConfirm.value = false;
+  repostConfirmPostId.value = null;
+  repostConfirmPost.value = null;
+  
+  try {
+    repostingPostIds.value.add(postId);
+    await api.post(`/posts/${postId}/repost`);
+    post.is_reposted = true;
+    post.reposts_count = (post.reposts_count || 0) + 1;
+  } catch (e: any) {
+    console.error('Failed to repost:', e);
+    error.value = e.response?.data?.message || 'リポストに失敗しました';
+  } finally {
+    repostingPostIds.value.delete(postId);
+  }
+};
+
+// リポスト取り消しを実行
+const executeUnrepost = async (postId: number, post: any) => {
+  try {
+    repostingPostIds.value.add(postId);
+    await api.delete(`/posts/${postId}/repost`);
+    post.is_reposted = false;
+    post.reposts_count = Math.max(0, (post.reposts_count || 1) - 1);
+  } catch (e: any) {
+    console.error('Failed to unrepost:', e);
+    error.value = e.response?.data?.message || 'リポスト取り消しに失敗しました';
+  } finally {
+    repostingPostIds.value.delete(postId);
+  }
 };
 
 // 外部クリックでメニューを閉じる

@@ -56,6 +56,8 @@ describe('HomePage.vue', () => {
               name: 'Test User',
               username: 'testuser',
             },
+            reposts_count: 0,
+            is_reposted: false,
           },
         ],
       }
@@ -98,6 +100,8 @@ describe('HomePage.vue', () => {
               name: 'Test User',
               username: 'testuser',
             },
+            reposts_count: 0,
+            is_reposted: false,
           },
         ],
       }
@@ -140,6 +144,8 @@ describe('HomePage.vue', () => {
               name: 'Test User',
               username: 'testuser',
             },
+            reposts_count: 0,
+            is_reposted: false,
           },
         ],
       }
@@ -185,6 +191,8 @@ describe('HomePage.vue', () => {
               name: 'Test User',
               username: 'testuser',
             },
+            reposts_count: 0,
+            is_reposted: false,
           },
         ],
       }
@@ -237,6 +245,8 @@ describe('HomePage.vue', () => {
               name: 'Other User',
               username: 'otheruser',
             },
+            reposts_count: 0,
+            is_reposted: false,
           },
         ],
       }
