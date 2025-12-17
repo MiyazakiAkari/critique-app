@@ -48,6 +48,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/posts/timeline', [PostController::class, 'timeline']);
     Route::post('/posts', [PostController::class, 'store']);
     Route::delete('/posts/{post}', [PostController::class, 'destroy']);
+    
+    // リポスト操作
+    Route::post('/posts/{post}/repost', [PostController::class, 'repost']);
+    Route::delete('/posts/{post}/repost', [PostController::class, 'unrepost']);
 });
 
 Route::get('/posts/{post}', [PostController::class, 'show']);

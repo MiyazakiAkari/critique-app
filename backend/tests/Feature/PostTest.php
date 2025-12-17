@@ -56,6 +56,8 @@ class PostTest extends TestCase
                         'name' => 'Test User',
                         'username' => 'testuser',
                     ],
+                    'reposts_count' => 0,
+                    'is_reposted' => false,
                 ],
             ]);
 
@@ -454,5 +456,191 @@ class PostTest extends TestCase
             $this->assertTrue(Storage::disk('public')->exists($post->image_path));
         }
     }
+
+    /** @test */
+    public function it_can_repost_a_post()
+    {
+        Storage::fake('public');
+        
+        $image = UploadedFile::fake()->create('test.jpg', 100, 'image/jpeg');
+        
+        // ユーザーAが投稿を作成
+        $post = Post::factory()->create([
+            'user_id' => $this->otherUser->id,
+            'content' => 'Original post',
+        ]);
+        
+        // ユーザーBが投稿をリポスト
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/repost");
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'message' => 'リポストしました',
+            ]);
+
+        // リポストがデータベースに保存されているか確認
+        $this->assertDatabaseHas('reposts', [
+            'user_id' => $this->user->id,
+            'post_id' => $post->id,
+        ]);
+    }
+
+    /** @test */
+    public function it_can_unrepost_a_post()
+    {
+        // ユーザーAが投稿を作成
+        $post = Post::factory()->create([
+            'user_id' => $this->otherUser->id,
+        ]);
+        
+        // ユーザーBが投稿をリポスト
+        $this->actingAs($this->user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/repost");
+
+        // 確認：リポストが作成されたか
+        $this->assertDatabaseHas('reposts', [
+            'user_id' => $this->user->id,
+            'post_id' => $post->id,
+        ]);
+
+        // ユーザーBがアンリポスト
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->deleteJson("/api/posts/{$post->id}/repost");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'リポストを取り消しました',
+            ]);
+
+        // 確認：リポストが削除されたか
+        $this->assertDatabaseMissing('reposts', [
+            'user_id' => $this->user->id,
+            'post_id' => $post->id,
+        ]);
+    }
+
+    /** @test */
+    public function it_toggles_repost_on_duplicate_repost()
+    {
+        // ユーザーAが投稿を作成
+        $post = Post::factory()->create([
+            'user_id' => $this->otherUser->id,
+        ]);
+        
+        // ユーザーBが投稿をリポスト
+        $response1 = $this->actingAs($this->user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/repost");
+
+        $response1->assertStatus(201)
+            ->assertJson(['message' => 'リポストしました']);
+
+        // ユーザーBが同じ投稿をリポスト（toggle）
+        $response2 = $this->actingAs($this->user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/repost");
+
+        $response2->assertStatus(200)
+            ->assertJson(['message' => 'リポストを取り消しました']);
+
+        // 確認：リポストが削除されたか
+        $this->assertDatabaseMissing('reposts', [
+            'user_id' => $this->user->id,
+            'post_id' => $post->id,
+        ]);
+    }
+
+    /** @test */
+    public function it_returns_repost_count_and_status()
+    {
+        Storage::fake('public');
+        
+        $image = UploadedFile::fake()->create('test.jpg', 100, 'image/jpeg');
+
+        // 投稿を作成
+        $post = Post::factory()->create([
+            'user_id' => $this->otherUser->id,
+            'content' => 'Test post',
+        ]);
+
+        // ユーザーBと別のユーザーがリポスト
+        $anotherUser = User::factory()->create();
+        
+        $this->actingAs($this->user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/repost");
+        
+        $this->actingAs($anotherUser, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/repost");
+
+        // ユーザーBが投稿を取得
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->getJson("/api/posts/{$post->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'post' => [
+                    'reposts_count' => 2,
+                    'is_reposted' => true,
+                ],
+            ]);
+
+        // 別のユーザー（C）が投稿を取得
+        $response = $this->actingAs($anotherUser, 'sanctum')
+            ->getJson("/api/posts/{$post->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'post' => [
+                    'reposts_count' => 2,
+                    'is_reposted' => true,
+                ],
+            ]);
+
+        // オリジナル投稿者が投稿を取得
+        $response = $this->actingAs($this->otherUser, 'sanctum')
+            ->getJson("/api/posts/{$post->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'post' => [
+                    'reposts_count' => 2,
+                    'is_reposted' => false,
+                ],
+            ]);
+    }
+
+    /** @test */
+    public function it_requires_authentication_for_repost()
+    {
+        $post = Post::factory()->create();
+
+        $response = $this->postJson("/api/posts/{$post->id}/repost");
+
+        $response->assertStatus(401);
+    }
+
+    /** @test */
+    public function it_requires_authentication_for_unrepost()
+    {
+        $post = Post::factory()->create();
+
+        $response = $this->deleteJson("/api/posts/{$post->id}/repost");
+
+        $response->assertStatus(401);
+    }
+
+    /** @test */
+    public function it_returns_404_when_unrepost_not_found()
+    {
+        $post = Post::factory()->create();
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->deleteJson("/api/posts/{$post->id}/repost");
+
+        $response->assertStatus(404)
+            ->assertJson([
+                'message' => 'リポストしていません',
+            ]);
+    }
 }
+
 

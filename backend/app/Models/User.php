@@ -96,6 +96,14 @@ class User extends Authenticatable
     }
 
     /**
+     * このユーザーのリポスト一覧
+     */
+    public function reposts(): HasMany
+    {
+        return $this->hasMany(Repost::class);
+    }
+
+    /**
      * Automatically create a profile when a user is created.
      */
     protected static function booted()
