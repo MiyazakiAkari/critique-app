@@ -477,6 +477,8 @@ interface Post {
     name: string;
     username: string;
   };
+  is_reposted: boolean;
+  reposts_count: number;
 }
 
 interface Critique {
@@ -852,14 +854,23 @@ const confirmRepost = async () => {
   repostConfirmPostId.value = null;
   repostConfirmPost.value = null;
   
+  // オプティミスティック更新前に元の値を保存
+  const originalIsReposted = post.is_reposted;
+  const originalRepostsCount = post.reposts_count;
+  
   try {
     repostingPostIds.value.add(postId);
-    await api.post(`/posts/${postId}/repost`);
+    // オプティミスティック更新
     post.is_reposted = true;
     post.reposts_count = (post.reposts_count || 0) + 1;
+    
+    await api.post(`/posts/${postId}/repost`);
   } catch (e: any) {
     console.error('Failed to repost:', e);
     error.value = e.response?.data?.message || 'リポストに失敗しました';
+    // エラー時に元の値に戻す
+    post.is_reposted = originalIsReposted;
+    post.reposts_count = originalRepostsCount;
   } finally {
     repostingPostIds.value.delete(postId);
   }
@@ -867,14 +878,23 @@ const confirmRepost = async () => {
 
 // リポスト取り消しを実行
 const executeUnrepost = async (postId: number, post: any) => {
+  // オプティミスティック更新前に元の値を保存
+  const originalIsReposted = post.is_reposted;
+  const originalRepostsCount = post.reposts_count;
+  
   try {
     repostingPostIds.value.add(postId);
-    await api.delete(`/posts/${postId}/repost`);
+    // オプティミスティック更新
     post.is_reposted = false;
     post.reposts_count = Math.max(0, (post.reposts_count ?? 0) - 1);
+    
+    await api.delete(`/posts/${postId}/repost`);
   } catch (e: any) {
     console.error('Failed to unrepost:', e);
     error.value = e.response?.data?.message || 'リポスト取り消しに失敗しました';
+    // エラー時に元の値に戻す
+    post.is_reposted = originalIsReposted;
+    post.reposts_count = originalRepostsCount;
   } finally {
     repostingPostIds.value.delete(postId);
   }
@@ -905,6 +925,55 @@ onMounted(async () => {
 // クリーンアップ
 onUnmounted(() => {
   document.removeEventListener('click', closeMenuOnOutsideClick);
+});
+
+// テスト用に公開
+defineExpose({
+  // タブ・表示状態
+  activeTab,
+  // 投稿データ
+  recommendedPosts,
+  followingPosts,
+  loading,
+  error,
+  // フォーム
+  newPostContent,
+  selectedImage,
+  imagePreview,
+  posting,
+  // 画像モーダル
+  showImageModal,
+  modalImageUrl,
+  // 削除機能
+  showDeleteConfirm,
+  deleteTarget,
+  // 添削機能
+  critiquesMap,
+  expandedPosts,
+  critiqueContent,
+  submittingCritique,
+  openCritiqueMenuId,
+  openPostMenuId,
+  // ユーザー情報
+  authUser,
+  // リポスト機能
+  repostingPostIds,
+  showRepostConfirm,
+  repostConfirmPostId,
+  repostConfirmPost,
+  // メソッド
+  handleTabChange,
+  togglePostMenu,
+  toggleCritiqueMenu,
+  deletePost,
+  deleteCritique,
+  confirmDelete,
+  cancelDelete,
+  toggleRepost,
+  confirmRepost,
+  executeUnrepost,
+  closeMenuOnOutsideClick,
+  goToProfile,
 });
 </script>
 

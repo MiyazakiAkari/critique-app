@@ -12,6 +12,11 @@ class PostController extends Controller
 {
     /**
      * タイムライン取得（フォロー中のユーザーの投稿とリポスト）
+     * 
+     * パフォーマンス最適化：
+     * - ユーザーのリポスト済み投稿IDを事前に一括取得（1クエリ）
+     * - 各投稿処理時にはメモリ内の配列検索（O(1)）でリポスト状態を判定
+     * - N+1クエリ問題を解消
      */
     public function timeline(): JsonResponse
     {
@@ -24,30 +29,34 @@ class PostController extends Controller
         // 自分のIDも含める
         $followingIds[] = $user->id;
         
+        // ユーザーがリポストした投稿IDを事前に取得（N+1対策）
+        $userRepostedPostIds = Repost::where('user_id', $user->id)
+            ->pluck('post_id')
+            ->toArray();
+        $userRepostedPostIdSet = array_flip($userRepostedPostIds);
+        
         // フォロー中のユーザーの直接投稿を取得
         $directPosts = Post::whereIn('user_id', $followingIds)
             ->with('user:id,name,username')
             ->withCount('reposts')
             ->get()
-            ->map(function ($post) use ($user) {
+            ->map(function ($post) use ($userRepostedPostIdSet) {
                 $post->display_at = $post->created_at;
-                $post->user_reposted = Repost::where('user_id', $user->id)
-                    ->where('post_id', $post->id)
-                    ->exists();
+                $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
                 return $post;
             });
         
         // フォロー中のユーザーのリポスト投稿を取得
         $repostedPosts = Repost::whereIn('user_id', $followingIds)
-            ->with('post.user:id,name,username')
+            ->with(['post' => function ($query) {
+                $query->with('user:id,name,username')
+                    ->withCount('reposts');
+            }])
             ->get()
-            ->map(function ($repost) use ($user) {
+            ->map(function ($repost) use ($userRepostedPostIdSet) {
                 $post = $repost->post;
                 $post->display_at = $repost->created_at;
-                $post->loadCount('reposts');
-                $post->user_reposted = Repost::where('user_id', $user->id)
-                    ->where('post_id', $post->id)
-                    ->exists();
+                $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
                 return $post;
             });
         
@@ -80,20 +89,23 @@ class PostController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
+        
+        // ユーザーがリポストした投稿IDを事前に取得（N+1対策）
+        $userRepostedPostIdSet = [];
+        if ($user) {
+            $userRepostedPostIds = Repost::where('user_id', $user->id)
+                ->pluck('post_id')
+                ->toArray();
+            $userRepostedPostIdSet = array_flip($userRepostedPostIds);
+        }
 
         $posts = Post::with('user:id,name,username')
             ->withCount('reposts')
             ->orderBy('created_at', 'desc')
             ->limit(50)
             ->get()
-            ->map(function ($post) use ($user) {
-                if ($user) {
-                    $post->user_reposted = Repost::where('user_id', $user->id)
-                        ->where('post_id', $post->id)
-                        ->exists();
-                } else {
-                    $post->user_reposted = false;
-                }
+            ->map(function ($post) use ($user, $userRepostedPostIdSet) {
+                $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
                 return $this->formatPost($post, $user);
             });
 
@@ -208,20 +220,23 @@ class PostController extends Controller
         
         /** @var \App\Models\User $currentUser */
         $currentUser = Auth::user();
+        
+        // 現在のユーザーがリポストした投稿IDを事前に取得（N+1対策）
+        $userRepostedPostIdSet = [];
+        if ($currentUser) {
+            $userRepostedPostIds = Repost::where('user_id', $currentUser->id)
+                ->pluck('post_id')
+                ->toArray();
+            $userRepostedPostIdSet = array_flip($userRepostedPostIds);
+        }
 
         $posts = Post::where('user_id', $user->id)
             ->with('user:id,name,username')
             ->withCount('reposts')
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($post) use ($currentUser) {
-                if ($currentUser) {
-                    $post->user_reposted = Repost::where('user_id', $currentUser->id)
-                        ->where('post_id', $post->id)
-                        ->exists();
-                } else {
-                    $post->user_reposted = false;
-                }
+            ->map(function ($post) use ($currentUser, $userRepostedPostIdSet) {
+                $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
                 return $this->formatPost($post, $currentUser);
             });
 

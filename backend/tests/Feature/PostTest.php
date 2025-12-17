@@ -583,7 +583,7 @@ class PostTest extends TestCase
                 ],
             ]);
 
-        // 別のユーザー（Cが投稿を取得
+        // 別のユーザー（C）が投稿を取得
         $response = $this->actingAs($anotherUser, 'sanctum')
             ->getJson("/api/posts/{$post->id}");
 
