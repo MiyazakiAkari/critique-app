@@ -871,7 +871,7 @@ const executeUnrepost = async (postId: number, post: any) => {
     repostingPostIds.value.add(postId);
     await api.delete(`/posts/${postId}/repost`);
     post.is_reposted = false;
-    post.reposts_count = Math.max(0, (post.reposts_count || 1) - 1);
+    post.reposts_count = Math.max(0, (post.reposts_count ?? 0) - 1);
   } catch (e: any) {
     console.error('Failed to unrepost:', e);
     error.value = e.response?.data?.message || 'リポスト取り消しに失敗しました';

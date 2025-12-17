@@ -27,9 +27,13 @@ class PostController extends Controller
         // フォロー中のユーザーの直接投稿を取得
         $directPosts = Post::whereIn('user_id', $followingIds)
             ->with('user:id,name,username')
+            ->withCount('reposts')
             ->get()
-            ->map(function ($post) {
+            ->map(function ($post) use ($user) {
                 $post->display_at = $post->created_at;
+                $post->user_reposted = Repost::where('user_id', $user->id)
+                    ->where('post_id', $post->id)
+                    ->exists();
                 return $post;
             });
         
@@ -37,9 +41,13 @@ class PostController extends Controller
         $repostedPosts = Repost::whereIn('user_id', $followingIds)
             ->with('post.user:id,name,username')
             ->get()
-            ->map(function ($repost) {
+            ->map(function ($repost) use ($user) {
                 $post = $repost->post;
                 $post->display_at = $repost->created_at;
+                $post->loadCount('reposts');
+                $post->user_reposted = Repost::where('user_id', $user->id)
+                    ->where('post_id', $post->id)
+                    ->exists();
                 return $post;
             });
         
@@ -74,10 +82,18 @@ class PostController extends Controller
         $user = Auth::user();
 
         $posts = Post::with('user:id,name,username')
+            ->withCount('reposts')
             ->orderBy('created_at', 'desc')
             ->limit(50)
             ->get()
             ->map(function ($post) use ($user) {
+                if ($user) {
+                    $post->user_reposted = Repost::where('user_id', $user->id)
+                        ->where('post_id', $post->id)
+                        ->exists();
+                } else {
+                    $post->user_reposted = false;
+                }
                 return $this->formatPost($post, $user);
             });
 
@@ -128,6 +144,8 @@ class PostController extends Controller
         $post->save();
 
         $post->load('user:id,name,username');
+        $post->loadCount('reposts');
+        $post->user_reposted = false; // 新規投稿はリポストされていない
 
         return response()->json([
             'message' => '投稿しました',
@@ -141,9 +159,18 @@ class PostController extends Controller
     public function show(Post $post): JsonResponse
     {
         $post->load('user:id,name,username');
+        $post->loadCount('reposts');
         
         /** @var \App\Models\User $user */
         $user = Auth::user();
+        
+        if ($user) {
+            $post->user_reposted = Repost::where('user_id', $user->id)
+                ->where('post_id', $post->id)
+                ->exists();
+        } else {
+            $post->user_reposted = false;
+        }
 
         return response()->json([
             'post' => $this->formatPost($post, $user),
@@ -184,9 +211,17 @@ class PostController extends Controller
 
         $posts = Post::where('user_id', $user->id)
             ->with('user:id,name,username')
+            ->withCount('reposts')
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($post) use ($currentUser) {
+                if ($currentUser) {
+                    $post->user_reposted = Repost::where('user_id', $currentUser->id)
+                        ->where('post_id', $post->id)
+                        ->exists();
+                } else {
+                    $post->user_reposted = false;
+                }
                 return $this->formatPost($post, $currentUser);
             });
 
@@ -256,14 +291,9 @@ class PostController extends Controller
      */
     private function formatPost(Post $post, ?\App\Models\User $user = null): array
     {
-        $isReposts = false;
-        $reposts_count = $post->reposts()->count();
-
-        if ($user) {
-            $isReposts = Repost::where('user_id', $user->id)
-                ->where('post_id', $post->id)
-                ->exists();
-        }
+        // Eager load済みのデータを使用（N+1クエリ対策）
+        $reposts_count = $post->reposts_count ?? 0;
+        $isReposted = $post->user_reposted ?? false;
 
         return [
             'id' => $post->id,
@@ -273,7 +303,7 @@ class PostController extends Controller
             'created_at' => $post->created_at->toISOString(),
             'user' => $post->user->only(['id', 'name', 'username']),
             'reposts_count' => $reposts_count,
-            'is_reposted' => $isReposts,
+            'is_reposted' => $isReposted,
         ];
     }
 }
