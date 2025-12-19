@@ -1,7 +1,15 @@
-# --- Stage 1: Vue (Vite) のビルド ---
+# --- Stage 1: Node ---
 FROM node:20 AS node-builder
 WORKDIR /app
+
+COPY composer.json composer.lock ./
+COPY package.json package-lock.json ./
+
+RUN npm install
+
 COPY . .
+
+RUN npm run build
 # Vueのビルド（Viteを想定）
 RUN npm install && npm run build
 
