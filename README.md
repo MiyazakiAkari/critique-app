@@ -42,6 +42,16 @@ docker-compose exec frontend npm install
 docker-compose exec frontend npm run dev
 ```
 
+## 🚀 Koyeb へのデプロイ
+
+本番環境へのデプロイについては、[KOYEB_DEPLOYMENT.md](./KOYEB_DEPLOYMENT.md) を参照してください。
+
+要点：
+- `Dockerfile` がマルチステージビルド対応
+- ポート 8000 でリッスン
+- PostgreSQL データベースが必須
+- GitHub 連携でワンクリックデプロイ可能
+
 ## 💻 開発ルール（チーム向け）
 
 - **ブランチ運用**

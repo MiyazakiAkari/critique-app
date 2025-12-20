@@ -1,0 +1,25 @@
+version: "1"
+
+services:
+  critique-app:
+    name: critique-app
+    image:
+      dockerfile: ./Dockerfile
+    ports:
+      - port: 8000
+        protocol: http
+    env:
+      - key: APP_NAME
+        value: Critique
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
