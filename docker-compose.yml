@@ -21,6 +21,10 @@ services:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - php
+    networks:
+      default:
+        aliases:
+          - nginx
 
   postgres:
     image: postgres:15

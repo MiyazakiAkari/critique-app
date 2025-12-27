@@ -12,11 +12,6 @@ class PostController extends Controller
 {
     /**
      * タイムライン取得（フォロー中のユーザーの投稿とリポスト）
-     * 
-     * パフォーマンス最適化：
-     * - ユーザーのリポスト済み投稿IDを事前に一括取得（1クエリ）
-     * - 各投稿処理時にはメモリ内の配列検索（O(1)）でリポスト状態を判定
-     * - N+1クエリ問題を解消
      */
     public function timeline(): JsonResponse
     {
@@ -310,11 +305,18 @@ class PostController extends Controller
         $reposts_count = $post->reposts_count ?? 0;
         $isReposted = $post->user_reposted ?? false;
 
+        // ストレージ URL を構築（config から取得）
+        $image_url = null;
+        if ($post->image_path) {
+            $app_url = config('app.url');
+            $image_url = rtrim($app_url, '/') . '/storage/' . $post->image_path;
+        }
+
         return [
             'id' => $post->id,
             'content' => $post->content,
             'image_path' => $post->image_path,
-            'image_url' => $post->image_path ? asset('storage/' . $post->image_path) : null,
+            'image_url' => $image_url,
             'created_at' => $post->created_at->toISOString(),
             'user' => $post->user->only(['id', 'name', 'username']),
             'reposts_count' => $reposts_count,
