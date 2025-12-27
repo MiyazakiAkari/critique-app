@@ -118,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../utils/axios'
 
@@ -136,9 +136,16 @@ const errorMessage = ref('')
 const hasSearched = ref(false)
 const searchTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
 
+// コンポーネントアンマウント時にタイムアウトをクリア
+onUnmounted(() => {
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value)
+  }
+})
+
 // Enterキーまたは入力で検索を実行
 const handleInput = () => {
-  // デバウンス処理：入力後500msで検索
+  // デバウンス処理：入力後300msで検索
   if (searchTimeout.value) {
     clearTimeout(searchTimeout.value)
   }
@@ -170,8 +177,24 @@ const performSearch = async () => {
     })
     
     searchResults.value = response.data.users || []
-  } catch (error) {
-    if (error instanceof Error) {
+  } catch (error: any) {
+    // axios エラーレスポンスの処理
+    if (error.response?.data?.message) {
+      errorMessage.value = error.response.data.message
+    } else if (error.response?.status === 422) {
+      // バリデーションエラー
+      const errors = error.response.data.errors
+      if (errors && typeof errors === 'object') {
+        const errorMessages = Object.values(errors).flat().join(', ')
+        errorMessage.value = errorMessages as string
+      } else {
+        errorMessage.value = 'バリデーションエラーが発生しました'
+      }
+    } else if (error.response?.status) {
+      // その他の HTTP エラー
+      errorMessage.value = `エラー (${error.response.status}): サーバーエラーが発生しました`
+    } else if (error instanceof Error) {
+      // ネットワークエラーなど
       errorMessage.value = error.message
     } else {
       errorMessage.value = '検索中にエラーが発生しました'
@@ -187,9 +210,13 @@ const goToUserProfile = (username: string) => {
 
 const goToProfile = () => {
   const userId = localStorage.getItem('userId')
-  if (userId) {
-    const username = localStorage.getItem('username')
+  const username = localStorage.getItem('username')
+
+  if (userId && username) {
     router.push(`/profile/${username}`)
+  } else {
+    console.warn('ユーザー認証情報が見つかりません。ログインページへリダイレクトします。')
+    router.push('/login')
   }
 }
 </script>

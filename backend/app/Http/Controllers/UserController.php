@@ -21,12 +21,15 @@ class UserController extends Controller
 
         $limit = $validated['limit'] ?? 20;
         $keyword = $validated['keyword'];
+        
+        // LIKE クエリのワイルドカード文字をエスケープ
+        $escapedKeyword = addslashes($keyword);
 
         $users = User::query()
             ->select('id', 'name', 'username')
-            ->where(function ($query) use ($keyword) {
-                $query->where('username', 'like', '%' . $keyword . '%')
-                    ->orWhere('name', 'like', '%' . $keyword . '%');
+            ->where(function ($query) use ($escapedKeyword) {
+                $query->where('username', 'like', '%' . $escapedKeyword . '%')
+                    ->orWhere('name', 'like', '%' . $escapedKeyword . '%');
             })
             ->orderBy('username')
             ->limit($limit)
