@@ -208,7 +208,7 @@
                   <svg class="w-5 h-5 group-hover:bg-blue-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                   </svg>
-                  <span class="text-sm">{{ critiquesMap[post.id]?.length || 0 }}</span>
+                  <span class="text-sm">{{ critiquesMap[post.id]?.length ?? post.critiques_count ?? 0 }}</span>
                 </button>
                 
                 <button 
@@ -730,6 +730,13 @@ const createCritique = async (postId: number) => {
     }
     critiquesMap.value[postId].push(response.data);
     
+    // 投稿の添削数を更新
+    const allPosts = [...recommendedPosts.value, ...followingPosts.value];
+    const post = allPosts.find(p => p.id === postId);
+    if (post) {
+      post.critiques_count = (post.critiques_count ?? 0) + 1;
+    }
+    
     // フォームをクリア
     critiqueContent.value[postId] = '';
   } catch (e: any) {
@@ -788,6 +795,13 @@ const confirmDelete = async () => {
         critiquesMap.value[postId] = critiquesMap.value[postId].filter(
           c => c.id !== critiqueId
         );
+      }
+      
+      // 投稿の添削数を更新
+      const allPosts = [...recommendedPosts.value, ...followingPosts.value];
+      const post = allPosts.find(p => p.id === postId);
+      if (post && post.critiques_count > 0) {
+        post.critiques_count--;
       }
     }
     
