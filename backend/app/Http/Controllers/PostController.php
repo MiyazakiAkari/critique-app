@@ -34,6 +34,7 @@ class PostController extends Controller
         $directPosts = Post::whereIn('user_id', $followingIds)
             ->with('user:id,name,username')
             ->withCount('reposts')
+            ->withCount('critiques')
             ->get()
             ->map(function ($post) use ($userRepostedPostIdSet) {
                 $post->display_at = $post->created_at;
@@ -45,7 +46,8 @@ class PostController extends Controller
         $repostedPosts = Repost::whereIn('user_id', $followingIds)
             ->with(['post' => function ($query) {
                 $query->with('user:id,name,username')
-                    ->withCount('reposts');
+                    ->withCount('reposts')
+                    ->withCount('critiques');
             }])
             ->get()
             ->map(function ($repost) use ($userRepostedPostIdSet) {
@@ -96,6 +98,7 @@ class PostController extends Controller
 
         $posts = Post::with('user:id,name,username')
             ->withCount('reposts')
+            ->withCount('critiques')
             ->orderBy('created_at', 'desc')
             ->limit(50)
             ->get()
@@ -303,6 +306,7 @@ class PostController extends Controller
     {
         // Eager load済みのデータを使用（N+1クエリ対策）
         $reposts_count = $post->reposts_count ?? 0;
+        $critiques_count = $post->critiques_count ?? 0;
         $isReposted = $post->user_reposted ?? false;
 
         // ストレージ URL を構築（config から取得）
@@ -320,6 +324,7 @@ class PostController extends Controller
             'created_at' => $post->created_at->toISOString(),
             'user' => $post->user->only(['id', 'name', 'username']),
             'reposts_count' => $reposts_count,
+            'critiques_count' => $critiques_count,
             'is_reposted' => $isReposted,
         ];
     }
