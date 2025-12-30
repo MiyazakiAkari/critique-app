@@ -479,6 +479,7 @@ interface Post {
   };
   is_reposted: boolean;
   reposts_count: number;
+  critiques_count?: number;
 }
 
 interface Critique {
@@ -532,6 +533,18 @@ const repostingPostIds = ref<Set<number>>(new Set());
 const showRepostConfirm = ref(false);
 const repostConfirmPostId = ref<number | null>(null);
 const repostConfirmPost = ref<any>(null);
+
+const syncCritiqueCount = (postId: number, delta: number) => {
+  const updated = new Set<Post>();
+  [recommendedPosts.value, followingPosts.value].forEach((posts) => {
+    const target = posts.find((post) => post.id === postId);
+    if (target && !updated.has(target)) {
+      const nextValue = Math.max(0, (target.critiques_count ?? 0) + delta);
+      target.critiques_count = nextValue;
+      updated.add(target);
+    }
+  });
+};
 
 // プロフィールページへ遷移
 const goToProfile = () => {
@@ -730,13 +743,8 @@ const createCritique = async (postId: number) => {
     }
     critiquesMap.value[postId].push(response.data);
     
-    // 投稿の添削数を両方の配列で更新
-    [recommendedPosts.value, followingPosts.value].forEach(posts => {
-      const post = posts.find(p => p.id === postId);
-      if (post) {
-        post.critiques_count = (post.critiques_count ?? 0) + 1;
-      }
-    });
+    // 投稿の添削数を更新（両配列の整合性を保つ）
+    syncCritiqueCount(postId, 1);
     
     // フォームをクリア
     critiqueContent.value[postId] = '';
@@ -798,13 +806,8 @@ const confirmDelete = async () => {
         );
       }
       
-      // 投稿の添削数を両方の配列で更新
-      [recommendedPosts.value, followingPosts.value].forEach(posts => {
-        const post = posts.find(p => p.id === postId);
-        if (post && post.critiques_count > 0) {
-          post.critiques_count--;
-        }
-      });
+      // 投稿の添削数を更新（両配列の整合性を保つ）
+      syncCritiqueCount(postId, -1);
     }
     
     // モーダルを閉じる
