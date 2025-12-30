@@ -730,12 +730,13 @@ const createCritique = async (postId: number) => {
     }
     critiquesMap.value[postId].push(response.data);
     
-    // 投稿の添削数を更新
-    const allPosts = [...recommendedPosts.value, ...followingPosts.value];
-    const post = allPosts.find(p => p.id === postId);
-    if (post) {
-      post.critiques_count = (post.critiques_count ?? 0) + 1;
-    }
+    // 投稿の添削数を両方の配列で更新
+    [recommendedPosts.value, followingPosts.value].forEach(posts => {
+      const post = posts.find(p => p.id === postId);
+      if (post) {
+        post.critiques_count = (post.critiques_count ?? 0) + 1;
+      }
+    });
     
     // フォームをクリア
     critiqueContent.value[postId] = '';
@@ -797,12 +798,13 @@ const confirmDelete = async () => {
         );
       }
       
-      // 投稿の添削数を更新
-      const allPosts = [...recommendedPosts.value, ...followingPosts.value];
-      const post = allPosts.find(p => p.id === postId);
-      if (post && post.critiques_count > 0) {
-        post.critiques_count--;
-      }
+      // 投稿の添削数を両方の配列で更新
+      [recommendedPosts.value, followingPosts.value].forEach(posts => {
+        const post = posts.find(p => p.id === postId);
+        if (post && post.critiques_count > 0) {
+          post.critiques_count--;
+        }
+      });
     }
     
     // モーダルを閉じる
