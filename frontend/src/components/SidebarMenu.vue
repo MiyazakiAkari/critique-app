@@ -69,9 +69,11 @@ const router = useRouter()
 const route = useRoute()
 
 const goToProfile = () => {
-  const username = localStorage.getItem('username')
-  if (username) {
-    router.push(`/profile/${username}`)
+  const authUser = JSON.parse(localStorage.getItem('auth_user') || '{}')
+  if (authUser.username) {
+    router.push(`/profile/${authUser.username}`)
+  } else {
+    router.push('/login')
   }
 }
 
