@@ -33,6 +33,11 @@ class PostController extends Controller
         // フォロー中のユーザーの直接投稿を取得
         $directPosts = Post::whereIn('user_id', $followingIds)
             ->with('user:id,name,username')
+            ->with(['critiques' => function ($query) {
+                $query->with('user:id,name,username')
+                    ->orderBy('created_at', 'asc')
+                    ->limit(1);
+            }])
             ->withCount('reposts')
             ->withCount('critiques')
             ->get()
@@ -46,6 +51,11 @@ class PostController extends Controller
         $repostedPosts = Repost::whereIn('user_id', $followingIds)
             ->with(['post' => function ($query) {
                 $query->with('user:id,name,username')
+                    ->with(['critiques' => function ($critiqueQuery) {
+                        $critiqueQuery->with('user:id,name,username')
+                            ->orderBy('created_at', 'asc')
+                            ->limit(1);
+                    }])
                     ->withCount('reposts')
                     ->withCount('critiques');
             }])
@@ -97,6 +107,11 @@ class PostController extends Controller
         }
 
         $posts = Post::with('user:id,name,username')
+            ->with(['critiques' => function ($query) {
+                $query->with('user:id,name,username')
+                    ->orderBy('created_at', 'asc')
+                    ->limit(1);
+            }])
             ->withCount('reposts')
             ->withCount('critiques')
             ->orderBy('created_at', 'desc')
@@ -316,6 +331,18 @@ class PostController extends Controller
             $image_url = rtrim($app_url, '/') . '/storage/' . $post->image_path;
         }
 
+        // 最初の添削をフォーマット
+        $first_critique = null;
+        if ($post->relationLoaded('critiques') && $post->critiques->isNotEmpty()) {
+            $critique = $post->critiques->first();
+            $first_critique = [
+                'id' => $critique->id,
+                'content' => $critique->content,
+                'created_at' => $critique->created_at->toISOString(),
+                'user' => $critique->user->only(['id', 'name', 'username']),
+            ];
+        }
+
         return [
             'id' => $post->id,
             'content' => $post->content,
@@ -326,6 +353,7 @@ class PostController extends Controller
             'reposts_count' => $reposts_count,
             'critiques_count' => $critiques_count,
             'is_reposted' => $isReposted,
+            'first_critique' => $first_critique,
         ];
     }
 }
