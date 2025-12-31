@@ -162,6 +162,29 @@
                 <img :src="post.image_url" alt="投稿画像" class="w-full max-h-96 object-cover hover:opacity-95 transition" />
               </div>
               
+              <!-- 一番上の添削を常に表示 -->
+              <div v-if="!expandedPosts.has(post.id) && critiquesMap[post.id]?.[0]" class="mt-3 border-t border-gray-200 pt-3">
+                <div class="flex space-x-2 pl-2 border-l-2 border-blue-200">
+                  <div class="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0"></div>
+                  <div class="flex-1">
+                    <div class="flex items-center space-x-2">
+                      <span class="font-semibold text-sm text-gray-900">{{ critiquesMap[post.id]?.[0]?.user.name }}</span>
+                      <span class="text-gray-500 text-sm">@{{ critiquesMap[post.id]?.[0]?.user.username }}</span>
+                      <span class="text-gray-500 text-sm">·</span>
+                      <span class="text-gray-500 text-sm">{{ critiquesMap[post.id]?.[0] ? formatRelativeTime(critiquesMap[post.id]![0]!.created_at) : '' }}</span>
+                    </div>
+                    <p class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">{{ critiquesMap[post.id]?.[0]?.content }}</p>
+                    <button 
+                      v-if="(critiquesMap[post.id]?.length ?? 0) > 1"
+                      @click="togglePostExpansion(post.id)"
+                      class="text-sm text-blue-500 hover:underline mt-1"
+                    >
+                      他の添削を見る ({{ (critiquesMap[post.id]?.length ?? 1) - 1 }}件)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="flex justify-between mt-3 max-w-md text-gray-500">
                 <button 
                   @click="togglePostExpansion(post.id)"
@@ -515,6 +538,10 @@ const fetchRecommendedPosts = async () => {
     error.value = '';
     const response = await api.get('/posts/recommended');
     recommendedPosts.value = response.data.posts;
+    // 各投稿の添削を取得
+    await Promise.all(
+      recommendedPosts.value.map(post => fetchCritiques(post.id))
+    );
   } catch (e: any) {
     console.error('Failed to fetch recommended posts:', e);
     console.error('Error response:', e.response?.data);
@@ -537,6 +564,10 @@ const fetchTimeline = async () => {
     
     const response = await api.get('/posts/timeline');
     followingPosts.value = response.data.posts;
+    // 各投稿の添削を取得
+    await Promise.all(
+      followingPosts.value.map(post => fetchCritiques(post.id))
+    );
   } catch (e: any) {
     console.error('Failed to fetch timeline:', e);
     console.error('Error response:', e.response?.data);
