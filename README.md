@@ -77,3 +77,7 @@ docker-compose exec frontend npm run dev
   - 秘密情報は `.env` に置き、絶対に Git に push しない
 
 ---
+
+## ER図
+<img width="606" height="987" alt="image" src="https://github.com/user-attachments/assets/d2932ed9-7087-4130-b13b-a37e1703327d" />
+
