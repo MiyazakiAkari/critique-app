@@ -8,6 +8,8 @@ use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Api\StripeController;
+use App\Http\Controllers\Api\BestCritiqueController;
 use Illuminate\Support\Facades\Route; // Import Route
 use Illuminate\Http\Request; // Import Request
 
@@ -67,4 +69,15 @@ Route::get('/posts/{post}/critiques', [CritiqueController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/posts/{post}/critiques', [CritiqueController::class, 'store']);
     Route::delete('/posts/{post}/critiques/{critique}', [CritiqueController::class, 'destroy']);
+});
+
+// Stripe決済関連（認証必須）
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/stripe/payment-intent', [StripeController::class, 'createPaymentIntent']);
+    Route::post('/stripe/confirm-payment', [StripeController::class, 'confirmPayment']);
+});
+
+// ベスト添削選択（認証必須）
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/posts/{post}/best-critique', [BestCritiqueController::class, 'selectBestCritique']);
 });
