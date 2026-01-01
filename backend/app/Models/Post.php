@@ -19,6 +19,19 @@ class Post extends Model
     protected $fillable = [
         'user_id',
         'content',
+        'reward_amount',
+        'stripe_payment_intent_id',
+        'best_critique_id',
+        'reward_paid',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'reward_paid' => 'boolean',
     ];
 
     /**
@@ -43,5 +56,13 @@ class Post extends Model
     public function reposts(): HasMany
     {
         return $this->hasMany(Repost::class);
+    }
+
+    /**
+     * ベスト添削
+     */
+    public function bestCritique(): BelongsTo
+    {
+        return $this->belongsTo(Critique::class, 'best_critique_id');
     }
 }

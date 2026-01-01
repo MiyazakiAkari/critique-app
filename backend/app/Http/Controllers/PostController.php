@@ -7,6 +7,8 @@ use App\Models\Repost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Stripe\Stripe;
+use Stripe\PaymentIntent;
 
 class PostController extends Controller
 {
@@ -148,13 +150,80 @@ class PostController extends Controller
             };
         }
 
+        $minReward = 100;
+        $maxReward = 10000;
+
+        $rawReward = $request->input('reward_amount');
+        if ($rawReward === '' || $rawReward === null) {
+            $normalizedReward = null;
+        } else {
+            $normalizedReward = (int) $rawReward;
+        }
+        $request->merge(['reward_amount' => $normalizedReward]);
+
         $validated = $request->validate([
             'content' => 'required|string|max:500',
             'image' => $imageRules,
+            'reward_amount' => [
+                'nullable',
+                'integer',
+                'min:0',
+                'max:' . $maxReward,
+                function ($attribute, $value, $fail) use ($minReward) {
+                    if (!is_null($value) && $value !== 0 && $value < $minReward) {
+                        $fail('謝礼金は最低' . $minReward . '円から設定してください。');
+                    }
+                },
+            ],
+            'payment_method_id' => 'nullable|string',
         ]);
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
+        
+        $rewardAmount = (int) ($validated['reward_amount'] ?? 0);
+        $paymentIntentId = null;
+        
+        // 謝礼金がある場合はStripe決済を処理
+        if ($rewardAmount > 0 && !empty($validated['payment_method_id'])) {
+            try {
+                Stripe::setApiKey(config('services.stripe.secret'));
+                
+                $paymentIntent = PaymentIntent::create([
+                    'amount' => $rewardAmount,
+                    'currency' => 'jpy',
+                    'payment_method' => $validated['payment_method_id'],
+                    'confirm' => true,
+                    'automatic_payment_methods' => [
+                        'enabled' => true,
+                        'allow_redirects' => 'never',
+                    ],
+                    'metadata' => [
+                        'user_id' => $user->id,
+                        'type' => 'post_reward',
+                    ],
+                ]);
+                
+                if ($paymentIntent->status !== 'succeeded') {
+                    return response()->json([
+                        'message' => '決済に失敗しました。カード情報を確認してください。',
+                        'error' => 'payment_failed',
+                    ], 400);
+                }
+                
+                $paymentIntentId = $paymentIntent->id;
+            } catch (\Stripe\Exception\CardException $e) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'error' => 'card_error',
+                ], 400);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => '決済処理中にエラーが発生しました: ' . $e->getMessage(),
+                    'error' => 'payment_error',
+                ], 500);
+            }
+        }
         
         // 画像を保存
         $imagePath = null;
@@ -166,6 +235,8 @@ class PostController extends Controller
         $post->user_id = $user->id;
         $post->content = $validated['content'];
         $post->image_path = $imagePath;
+        $post->reward_amount = $rewardAmount;
+        $post->stripe_payment_intent_id = $paymentIntentId;
         $post->save();
 
         $post->load('user:id,name,username');
@@ -354,6 +425,10 @@ class PostController extends Controller
             'critiques_count' => $critiques_count,
             'is_reposted' => $isReposted,
             'first_critique' => $first_critique,
+            'reward_amount' => $post->reward_amount,
+            'stripe_payment_intent_id' => $post->stripe_payment_intent_id,
+            'best_critique_id' => $post->best_critique_id,
+            'reward_paid' => $post->reward_paid,
         ];
     }
 }

@@ -57,6 +57,41 @@
                 </svg>
               </button>
             </div>
+
+            <!-- 謝礼金設定 -->
+            <div v-if="showRewardSettings" class="mt-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-sm font-medium text-gray-700">謝礼金を設定</label>
+                <button @click="showRewardSettings = false" class="text-gray-400 hover:text-gray-600">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              <input
+                type="number"
+                :value="rewardAmount"
+                min="0"
+                :max="MAX_REWARD_AMOUNT"
+                step="100"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholder="例: 1000"
+                @input="handleRewardInput"
+              />
+              <p class="text-xs text-gray-500 mt-1">最低100円から最大10000円まで設定できます。</p>
+              <p class="text-sm text-gray-500 mt-1">報酬なしでも投稿できます。</p>
+              <div class="flex gap-2 mt-2">
+                <button
+                  v-for="preset in rewardPresets"
+                  :key="preset"
+                  @click="setRewardAmount(preset)"
+                  class="px-2 py-1 bg-white hover:bg-gray-100 rounded text-xs font-medium border border-gray-300"
+                >
+                  ¥{{ preset.toLocaleString() }}
+                </button>
+              </div>
+              <RewardBadge v-if="rewardAmount > 0" :amount="rewardAmount" class="mt-2" />
+            </div>
             
             <div class="flex justify-between items-center mt-3">
               <div class="flex space-x-2 text-blue-500">
@@ -72,13 +107,23 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                   </svg>
                 </label>
+                <button 
+                  @click="showRewardSettings = !showRewardSettings"
+                  class="p-2 hover:bg-blue-50 rounded-full"
+                  :class="{ 'bg-blue-50': showRewardSettings }"
+                  aria-label="謝礼金を設定"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
               </div>
               <button 
-                @click="createPost"
+                @click="handlePostClick"
                 :disabled="!newPostContent.trim() || !selectedImage || posting"
                 class="bg-blue-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {{ posting ? '投稿中...' : '投稿する' }}
+                {{ posting ? '投稿中...' : (rewardAmount > 0 ? '支払って投稿' : '投稿する') }}
               </button>
             </div>
           </div>
@@ -115,6 +160,7 @@
                   <span class="text-gray-500">@{{ post.user.username }}</span>
                   <span class="text-gray-500">·</span>
                   <span class="text-gray-500">{{ formatRelativeTime(post.created_at) }}</span>
+                  <RewardBadge v-if="post.reward_amount && post.reward_amount > 0" :amount="post.reward_amount" />
                 </div>
                 
                 <!-- 投稿三点リーダーメニュー -->
@@ -443,6 +489,16 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- 決済モーダル -->
+    <PaymentModal
+      :show="showPaymentModal"
+      :amount="rewardAmount"
+      :stripe-publishable-key="stripePublishableKey"
+      @payment-completed="handlePaymentCompleted"
+      @payment-error="handlePaymentError"
+      @cancel="handlePaymentCancel"
+    />
   </div>
 </template>
 
@@ -450,6 +506,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import api from '../utils/axios';
 import SidebarMenu from '../components/SidebarMenu.vue';
+import RewardBadge from '../components/RewardBadge.vue';
+import PaymentModal from '../components/PaymentModal.vue';
+
+// Stripe公開キー
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
 
 interface Post {
   id: number;
@@ -466,6 +527,10 @@ interface Post {
   reposts_count: number;
   critiques_count?: number;
   first_critique?: Critique;
+  reward_amount?: number;
+  stripe_payment_intent_id?: string;
+  best_critique_id?: number;
+  reward_paid?: boolean;
 }
 
 interface Critique {
@@ -479,6 +544,16 @@ interface Critique {
   };
 }
 
+const MAX_REWARD_AMOUNT = 10000;
+const rewardPresets = [500, 1000, 3000, 5000, MAX_REWARD_AMOUNT];
+
+const clampRewardAmount = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(Math.max(Math.round(value), 0), MAX_REWARD_AMOUNT);
+};
+
 const activeTab = ref<'recommended' | 'following'>('recommended');
 // 投稿データ
 const recommendedPosts = ref<Post[]>([]);
@@ -491,6 +566,25 @@ const newPostContent = ref('');
 const selectedImage = ref<File | null>(null);
 const imagePreview = ref<string | null>(null);
 const posting = ref(false);
+const showRewardSettings = ref(false);
+const rewardAmount = ref(0);
+
+// 決済モーダル
+const showPaymentModal = ref(false);
+const pendingPaymentMethodId = ref<string | null>(null);
+
+const setRewardAmount = (value: number | null | undefined) => {
+  const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+  rewardAmount.value = clampRewardAmount(numericValue);
+};
+
+const handleRewardInput = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const inputValue = Number.isNaN(target.valueAsNumber)
+    ? Number(target.value)
+    : target.valueAsNumber;
+  setRewardAmount(inputValue);
+};
 
 // 画像モーダル
 const showImageModal = ref(false);
@@ -571,8 +665,40 @@ const fetchTimeline = async () => {
   }
 };
 
+// 投稿ボタンクリック時のハンドラー
+const handlePostClick = () => {
+  if (!newPostContent.value.trim() || !selectedImage.value) return;
+  
+  // 報酬額が設定されている場合は決済モーダルを表示
+  if (rewardAmount.value > 0) {
+    showPaymentModal.value = true;
+  } else {
+    // 報酬なしの場合は直接投稿
+    createPost();
+  }
+};
+
+// 決済完了時のハンドラー
+const handlePaymentCompleted = async (paymentMethodId: string) => {
+  pendingPaymentMethodId.value = paymentMethodId;
+  showPaymentModal.value = false;
+  // 決済完了後に投稿を作成
+  await createPost(paymentMethodId);
+};
+
+// 決済エラー時のハンドラー
+const handlePaymentError = (errorMsg: string) => {
+  error.value = errorMsg;
+  showPaymentModal.value = false;
+};
+
+// 決済キャンセル時のハンドラー
+const handlePaymentCancel = () => {
+  showPaymentModal.value = false;
+};
+
 // 新規投稿を作成
-const createPost = async () => {
+const createPost = async (paymentMethodId?: string) => {
   if (!newPostContent.value.trim() || !selectedImage.value) return;
   
   try {
@@ -580,6 +706,15 @@ const createPost = async () => {
     
     const formData = new FormData();
     formData.append('content', newPostContent.value);
+    
+    // 報酬額と決済情報を追加
+    if (rewardAmount.value > 0) {
+      formData.append('reward_amount', rewardAmount.value.toString());
+      if (paymentMethodId) {
+        formData.append('payment_method_id', paymentMethodId);
+      }
+    }
+    
     if (selectedImage.value) {
       formData.append('image', selectedImage.value);
     }
@@ -594,6 +729,9 @@ const createPost = async () => {
     newPostContent.value = '';
     selectedImage.value = null;
     imagePreview.value = null;
+    showRewardSettings.value = false;
+    setRewardAmount(0);
+    pendingPaymentMethodId.value = null;
     const fileInput = document.getElementById('image-upload') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
   } catch (e: any) {
