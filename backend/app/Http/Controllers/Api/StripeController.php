@@ -5,62 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
 use Illuminate\Http\Request;
-use Stripe\Stripe;
 use Stripe\PaymentIntent;
 
 class StripeController extends Controller
 {
     /**
-     * 決済インテントを作成
-     */
-    public function createPaymentIntent(Request $request)
-    {
-        $request->validate([
-            'post_id' => 'required|exists:posts,id',
-            'amount' => 'required|integer|min:100', // 最低100円
-        ]);
-
-        $post = Post::findOrFail($request->post_id);
-
-        // 投稿の作成者のみが謝礼金を設定できる
-        if ($post->user_id !== $request->user()->id) {
-            return response()->json(['error' => '権限がありません'], 403);
-        }
-
-        // すでに決済が完了している場合はエラー
-        if ($post->stripe_payment_intent_id && $post->reward_amount > 0) {
-            return response()->json(['error' => 'すでに謝礼金が設定されています'], 400);
-        }
-
-        try {
-            Stripe::setApiKey(config('services.stripe.secret'));
-
-            $paymentIntent = PaymentIntent::create([
-                'amount' => $request->amount,
-                'currency' => 'jpy',
-                'metadata' => [
-                    'post_id' => $post->id,
-                    'user_id' => $request->user()->id,
-                ],
-            ]);
-
-            // 投稿に決済情報を保存
-            $post->update([
-                'reward_amount' => $request->amount,
-                'stripe_payment_intent_id' => $paymentIntent->id,
-            ]);
-
-            return response()->json([
-                'clientSecret' => $paymentIntent->client_secret,
-                'paymentIntentId' => $paymentIntent->id,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * 決済の確認
+     * 決済状態の確認
+     * 投稿に紐づく決済の状態を確認する
      */
     public function confirmPayment(Request $request)
     {
@@ -69,8 +20,6 @@ class StripeController extends Controller
         ]);
 
         try {
-            Stripe::setApiKey(config('services.stripe.secret'));
-
             $paymentIntent = PaymentIntent::retrieve($request->payment_intent_id);
 
             $post = Post::where('stripe_payment_intent_id', $paymentIntent->id)->first();
@@ -86,6 +35,25 @@ class StripeController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * 決済履歴の取得
+     * 認証ユーザーの決済履歴を取得する
+     */
+    public function getPaymentHistory(Request $request)
+    {
+        $user = $request->user();
+        
+        $posts = Post::where('user_id', $user->id)
+            ->whereNotNull('stripe_payment_intent_id')
+            ->where('reward_amount', '>', 0)
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'content', 'reward_amount', 'stripe_payment_intent_id', 'created_at']);
+
+        return response()->json([
+            'payments' => $posts,
+        ]);
     }
 }
 

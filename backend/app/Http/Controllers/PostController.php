@@ -7,9 +7,8 @@ use App\Models\Repost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Stripe\Stripe;
 use Stripe\PaymentIntent;
-
+use Illuminate\Support\Facades\Log;
 class PostController extends Controller
 {
     /**
@@ -153,8 +152,9 @@ class PostController extends Controller
         $minReward = 100;
         $maxReward = 10000;
 
+        // 報酬額を正規化: 空文字、null、0 はすべて null（報酬なし）として扱う
         $rawReward = $request->input('reward_amount');
-        if ($rawReward === '' || $rawReward === null) {
+        if ($rawReward === '' || $rawReward === null || $rawReward === 0 || $rawReward === '0') {
             $normalizedReward = null;
         } else {
             $normalizedReward = (int) $rawReward;
@@ -167,13 +167,8 @@ class PostController extends Controller
             'reward_amount' => [
                 'nullable',
                 'integer',
-                'min:0',
+                'min:' . $minReward,
                 'max:' . $maxReward,
-                function ($attribute, $value, $fail) use ($minReward) {
-                    if (!is_null($value) && $value !== 0 && $value < $minReward) {
-                        $fail('謝礼金は最低' . $minReward . '円から設定してください。');
-                    }
-                },
             ],
             'payment_method_id' => 'nullable|string',
         ]);
@@ -187,8 +182,6 @@ class PostController extends Controller
         // 謝礼金がある場合はStripe決済を処理
         if ($rewardAmount > 0 && !empty($validated['payment_method_id'])) {
             try {
-                Stripe::setApiKey(config('services.stripe.secret'));
-                
                 $paymentIntent = PaymentIntent::create([
                     'amount' => $rewardAmount,
                     'currency' => 'jpy',
@@ -213,13 +206,25 @@ class PostController extends Controller
                 
                 $paymentIntentId = $paymentIntent->id;
             } catch (\Stripe\Exception\CardException $e) {
+                // カードエラーはユーザーに表示しても安全なメッセージを返す
+                Log::warning('Stripe card error', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                    'code' => $e->getStripeCode(),
+                ]);
                 return response()->json([
-                    'message' => $e->getMessage(),
+                    'message' => 'カードが拒否されました。別のカードをお試しください。',
                     'error' => 'card_error',
                 ], 400);
             } catch (\Exception $e) {
+                // 詳細なエラーはサーバーログに記録する
+                Log::error('Payment processing error', [
+                    'user_id' => $user->id,
+                    'exception' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
                 return response()->json([
-                    'message' => '決済処理中にエラーが発生しました: ' . $e->getMessage(),
+                    'message' => '決済処理中にエラーが発生しました。しばらくしてからもう一度お試しください。',
                     'error' => 'payment_error',
                 ], 500);
             }

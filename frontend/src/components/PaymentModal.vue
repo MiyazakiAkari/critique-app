@@ -131,7 +131,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'payment-completed': [clientSecret: string, paymentIntentId: string];
+  'payment-completed': [paymentMethodId: string];
   'payment-error': [error: string];
   'cancel': [];
 }>();
@@ -296,7 +296,7 @@ const handlePayment = async () => {
     if (paymentMethod) {
       paymentCompleted.value = true;
       // paymentMethod.id を親に渡す（投稿作成時に使用）
-      emit('payment-completed', paymentMethod.id, '');
+      emit('payment-completed', paymentMethod.id);
     }
   } catch (error: any) {
     console.error('決済エラー:', error);

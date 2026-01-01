@@ -73,8 +73,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Stripe決済関連（認証必須）
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/stripe/payment-intent', [StripeController::class, 'createPaymentIntent']);
     Route::post('/stripe/confirm-payment', [StripeController::class, 'confirmPayment']);
+    Route::get('/stripe/payment-history', [StripeController::class, 'getPaymentHistory']);
 });
 
 // ベスト添削選択（認証必須）

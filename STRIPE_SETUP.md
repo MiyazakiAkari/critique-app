@@ -114,6 +114,6 @@ docker compose exec php php artisan migrate
 ### フロントエンド
 - `src/components/RewardBadge.vue`
 - `src/components/RewardAmountSelector.vue`
-- `src/components/StripePaymentForm.vue`
+- `src/components/PaymentModal.vue`
 - `src/components/BestCritiqueSelector.vue`
 - `src/pages/HomePage.vue`
