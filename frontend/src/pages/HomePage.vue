@@ -162,6 +162,29 @@
                 <img :src="post.image_url" alt="投稿画像" class="w-full max-h-96 object-cover hover:opacity-95 transition" />
               </div>
               
+              <!-- 一番上の添削を常に表示 -->
+              <div v-if="!expandedPosts.has(post.id) && (post.first_critique || critiquesMap[post.id]?.[0])" class="mt-3 border-t border-gray-200 pt-3">
+                <div class="flex space-x-2 pl-2 border-l-2 border-blue-200">
+                  <div class="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0"></div>
+                  <div class="flex-1">
+                    <div class="flex items-center space-x-2">
+                      <span class="font-semibold text-sm text-gray-900">{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.user.name }}</span>
+                      <span class="text-gray-500 text-sm">@{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.user.username }}</span>
+                      <span class="text-gray-500 text-sm">·</span>
+                      <span class="text-gray-500 text-sm">{{ (critiquesMap[post.id]?.[0] || post.first_critique) ? formatRelativeTime((critiquesMap[post.id]?.[0] || post.first_critique)!.created_at) : '' }}</span>
+                    </div>
+                    <p class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.content }}</p>
+                    <button 
+                      v-if="(post.critiques_count ?? 0) > 1"
+                      @click.stop="togglePostExpansion(post.id)"
+                      class="text-sm text-blue-500 hover:underline mt-1"
+                    >
+                      他の添削を見る ({{ (post.critiques_count ?? 1) - 1 }}件)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="flex justify-between mt-3 max-w-md text-gray-500">
                 <button 
                   @click="togglePostExpansion(post.id)"
@@ -442,6 +465,7 @@ interface Post {
   is_reposted: boolean;
   reposts_count: number;
   critiques_count?: number;
+  first_critique?: Critique;
 }
 
 interface Critique {
