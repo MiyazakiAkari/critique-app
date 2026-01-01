@@ -78,7 +78,7 @@
                 placeholder="例: 1000"
                 @input="handleRewardInput"
               />
-              <p class="text-xs text-gray-500 mt-1">最低100円から最大10000円まで設定できます。</p>
+              <p class="text-xs text-gray-500 mt-1">最低100円から最大{{ MAX_REWARD_AMOUNT.toLocaleString() }}円まで設定できます。</p>
               <p class="text-sm text-gray-500 mt-1">報酬なしでも投稿できます。</p>
               <div class="flex gap-2 mt-2">
                 <button
@@ -679,22 +679,40 @@ const handlePostClick = () => {
 };
 
 // 決済完了時のハンドラー
-const handlePaymentCompleted = async (paymentMethodId: string) => {
-  pendingPaymentMethodId.value = paymentMethodId;
-  showPaymentModal.value = false;
-  // 決済完了後に投稿を作成
-  await createPost(paymentMethodId);
+const handlePaymentCompleted = async (paymentMethodId: string, _extra?: any) => {
+  try {
+    // paymentMethodIdのバリデーション
+    if (!paymentMethodId || typeof paymentMethodId !== 'string' || !paymentMethodId.startsWith('pm_')) {
+      console.error('Invalid paymentMethodId received:', paymentMethodId, _extra);
+      error.value = '決済情報が正しく取得できませんでした。もう一度お試しください。';
+      showPaymentModal.value = false;
+      return;
+    }
+    
+    pendingPaymentMethodId.value = paymentMethodId;
+    showPaymentModal.value = false;
+    
+    // 決済完了後に投稿を作成
+    await createPost(paymentMethodId);
+  } catch (e: any) {
+    console.error('Payment completion handler error:', e);
+    error.value = e.message || '決済処理中にエラーが発生しました';
+    showPaymentModal.value = false;
+    pendingPaymentMethodId.value = null;
+  }
 };
 
 // 決済エラー時のハンドラー
 const handlePaymentError = (errorMsg: string) => {
-  error.value = errorMsg;
+  error.value = typeof errorMsg === 'string' ? errorMsg : '決済処理中にエラーが発生しました';
   showPaymentModal.value = false;
+  pendingPaymentMethodId.value = null;
 };
 
 // 決済キャンセル時のハンドラー
 const handlePaymentCancel = () => {
   showPaymentModal.value = false;
+  pendingPaymentMethodId.value = null;
 };
 
 // 新規投稿を作成
