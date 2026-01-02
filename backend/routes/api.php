@@ -12,6 +12,23 @@ use App\Http\Controllers\Api\StripeController;
 use App\Http\Controllers\Api\BestCritiqueController;
 use Illuminate\Support\Facades\Route; // Import Route
 use Illuminate\Http\Request; // Import Request
+use Illuminate\Support\Facades\DB;
+
+// ヘルスチェックエンドポイント（AWS / ロードバランサー用）
+Route::get('/health', function () {
+    try {
+        DB::connection()->getPdo();
+        return response()->json([
+            'status' => 'healthy',
+            'timestamp' => now()->toIso8601String()
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'unhealthy',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
 
 Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [LoginController::class, 'login']);

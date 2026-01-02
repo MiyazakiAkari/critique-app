@@ -34,7 +34,7 @@
                   class="w-8 h-8 rounded-full"
                 />
                 <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center" v-else>
-                  <span class="text-gray-500 text-sm">{{ critique.user.username[0].toUpperCase() }}</span>
+                  <span class="text-gray-500 text-sm">{{ critique.user?.username?.[0]?.toUpperCase() ?? '?' }}</span>
                 </div>
                 <span class="font-medium">@{{ critique.user.username }}</span>
               </div>
