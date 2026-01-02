@@ -76,7 +76,7 @@ jobs:
                 "environment": {
                   "APP_NAME": "CritiqueApp",
                   "APP_ENV": "production",
-                  "APP_DEBUG": "true",
+                  "APP_DEBUG": "false",
                   "APP_KEY": $app_key,
                   "APP_URL": "https://critiq.j6r0k96s1e66c.ap-northeast-1.cs.amazonlightsail.com",
                   "LOG_CHANNEL": "stderr",
