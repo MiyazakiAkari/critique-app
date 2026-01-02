@@ -18,9 +18,9 @@ RUN apk add --no-cache \
     curl \
     git \
     unzip \
-    libpq \
-    postgresql-client \
-    bash \
+    postgresql-dev \
+    linux-headers \
+    oniguruma-dev \
     && docker-php-ext-install pdo pdo_pgsql bcmath mbstring
 
 # Install Composer
