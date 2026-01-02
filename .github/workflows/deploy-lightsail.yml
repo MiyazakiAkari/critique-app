@@ -77,9 +77,9 @@ jobs:
             "containerName": "app",
             "containerPort": 8000,
             "healthCheck": {
-              "path": "/api/health",
+              "path": "/",
               "intervalSeconds": 30,
-              "timeoutSeconds": 5
+              "timeoutSeconds": 10
             }
           }
           EOF
