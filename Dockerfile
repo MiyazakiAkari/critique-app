@@ -32,18 +32,23 @@ WORKDIR /var/www/html
 COPY backend .
 
 # Install PHP dependencies (without dev)
+# Create necessary directories first
+RUN mkdir -p storage/framework/cache \
+    && mkdir -p storage/framework/sessions \
+    && mkdir -p storage/framework/views \
+    && mkdir -p storage/logs \
+    && mkdir -p bootstrap/cache \
+    && mkdir -p /var/lib/nginx/logs \
+    && mkdir -p /run/nginx
+
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
 # Copy frontend build
 COPY --from=frontend-builder /frontend/dist ./public
 
-# Create necessary directories
-RUN mkdir -p storage/framework/cache \
-    && mkdir -p storage/framework/sessions \
-    && mkdir -p storage/framework/views \
-    && mkdir -p storage/logs \
-    && mkdir -p /var/lib/nginx/logs \
-    && mkdir -p /run/nginx \
+# Generate package manifest and set permissions
+RUN php artisan package:discover --ansi || true \
+    && chmod -R 777 storage bootstrap/cache \
     && chown -R nobody:nobody storage bootstrap/cache public /var/lib/nginx /run/nginx
 
 # Configure Nginx
