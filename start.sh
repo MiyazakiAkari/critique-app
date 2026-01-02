@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Koyeb startup script
 # This script runs migrations and starts the application
 
