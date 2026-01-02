@@ -52,31 +52,43 @@ jobs:
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
       - name: Create deployment
+        env:
+          CONTAINER_IMAGE: ${{ steps.image.outputs.image }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
-          cat > containers.json << EOF
-          {
-            "app": {
-              "image": "${{ steps.image.outputs.image }}",
-              "ports": {
-                "8000": "HTTP"
-              },
-              "environment": {
-                "APP_NAME": "CritiqueApp",
-                "APP_ENV": "production",
-                "APP_DEBUG": "true",
-                "APP_KEY": "${{ secrets.APP_KEY }}",
-                "APP_URL": "https://critiq.j6r0k96s1e66c.ap-northeast-1.cs.amazonlightsail.com",
-                "LOG_CHANNEL": "stderr",
-                "DB_CONNECTION": "pgsql",
-                "DB_HOST": "${{ secrets.DB_HOST }}",
-                "DB_PORT": "5432",
-                "DB_DATABASE": "${{ secrets.DB_DATABASE }}",
-                "DB_USERNAME": "${{ secrets.DB_USERNAME }}",
-                "DB_PASSWORD": "${{ secrets.DB_PASSWORD }}"
+          jq -n \
+            --arg image "$CONTAINER_IMAGE" \
+            --arg app_key "$APP_KEY" \
+            --arg db_host "$DB_HOST" \
+            --arg db_database "$DB_DATABASE" \
+            --arg db_username "$DB_USERNAME" \
+            --arg db_password "$DB_PASSWORD" \
+            '{
+              "app": {
+                "image": $image,
+                "ports": {
+                  "8000": "HTTP"
+                },
+                "environment": {
+                  "APP_NAME": "CritiqueApp",
+                  "APP_ENV": "production",
+                  "APP_DEBUG": "true",
+                  "APP_KEY": $app_key,
+                  "APP_URL": "https://critiq.j6r0k96s1e66c.ap-northeast-1.cs.amazonlightsail.com",
+                  "LOG_CHANNEL": "stderr",
+                  "DB_CONNECTION": "pgsql",
+                  "DB_HOST": $db_host,
+                  "DB_PORT": "5432",
+                  "DB_DATABASE": $db_database,
+                  "DB_USERNAME": $db_username,
+                  "DB_PASSWORD": $db_password
+                }
               }
-            }
-          }
-          EOF
+            }' > containers.json
           
           cat > public-endpoint.json << EOF
           {
