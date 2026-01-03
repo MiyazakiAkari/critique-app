@@ -32,29 +32,37 @@ WORKDIR /var/www/html
 COPY backend .
 
 # Install PHP dependencies (without dev)
+# Create necessary directories first
+RUN mkdir -p storage/framework/cache \
+    && mkdir -p storage/framework/sessions \
+    && mkdir -p storage/framework/views \
+    && mkdir -p storage/logs \
+    && mkdir -p bootstrap/cache \
+    && mkdir -p /var/lib/nginx/logs \
+    && mkdir -p /run/nginx
+
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
 # Copy frontend build
 COPY --from=frontend-builder /frontend/dist ./public
 
-# Create necessary directories
-RUN mkdir -p storage/framework/cache \
-    && mkdir -p storage/framework/sessions \
-    && mkdir -p storage/framework/views \
-    && mkdir -p storage/logs \
-    && chown -R www-data:www-data storage bootstrap/cache public
+# Generate package manifest and set permissions
+RUN php artisan package:discover --ansi || true \
+    && chmod -R 777 storage bootstrap/cache \
+    && chown -R nobody:nobody storage bootstrap/cache public /var/lib/nginx /run/nginx
 
 # Configure Nginx
 COPY nginx/default.conf /etc/nginx/http.d/default.conf
+
+# Configure PHP-FPM to listen on port 9000
+RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/' /usr/local/etc/php-fpm.d/www.conf || true
 
 # Copy startup script
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 # Set permissions
-RUN chown -R www-data:www-data /var/www/html
-
-USER www-data
+RUN chown -R nobody:nobody /var/www/html
 
 EXPOSE 8000
 
