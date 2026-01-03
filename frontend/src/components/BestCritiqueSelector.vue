@@ -132,7 +132,27 @@ const selectBestCritique = async () => {
     emit('critique-selected', selectedCritiqueId.value);
   } catch (error: any) {
     console.error('ベスト添削選択エラー:', error);
-    errorMessage.value = error.response?.data?.error || 'ベスト添削の選択に失敗しました';
+    
+    // エラータイプに応じたメッセージを設定
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      errorMessage.value = 'リクエストがタイムアウトしました。もう一度お試しください。';
+    } else if (!error.response) {
+      // ネットワークエラー（サーバーに到達できない）
+      errorMessage.value = 'ネットワークエラーが発生しました。接続を確認してください。';
+    } else if (error.response.status === 401) {
+      errorMessage.value = '認証エラーが発生しました。再ログインしてください。';
+    } else if (error.response.status === 403) {
+      errorMessage.value = 'この操作を行う権限がありません。';
+    } else if (error.response.status === 404) {
+      errorMessage.value = '対象の投稿または添削が見つかりませんでした。';
+    } else if (error.response.status === 422) {
+      errorMessage.value = error.response.data?.message || error.response.data?.error || '入力内容に問題があります。';
+    } else if (error.response.status >= 500) {
+      errorMessage.value = 'サーバーエラーが発生しました。しばらくしてからお試しください。';
+    } else {
+      errorMessage.value = error.response.data?.error || error.response.data?.message || 'ベスト添削の選択に失敗しました';
+    }
+    
     emit('selection-error', errorMessage.value);
   } finally {
     isProcessing.value = false;

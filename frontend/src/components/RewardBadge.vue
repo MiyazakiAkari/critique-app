@@ -22,13 +22,14 @@ const props = defineProps<{
 
 const numericAmount = computed(() => {
   if (typeof props.amount === 'number') {
-    return props.amount;
+    return Math.max(0, props.amount);
   }
 
   if (typeof props.amount === 'string') {
-    const sanitized = props.amount.replace(/[^0-9.-]/g, '');
+    // 報酬額は常に正の数のため、マイナス記号は除外
+    const sanitized = props.amount.replace(/[^0-9.]/g, '');
     const parsed = Number(sanitized);
-    return Number.isFinite(parsed) ? parsed : 0;
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
   }
 
   return 0;

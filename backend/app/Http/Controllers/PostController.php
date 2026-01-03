@@ -152,10 +152,11 @@ class PostController extends Controller
         $minReward = 100;
         $maxReward = 10000;
 
-        // 報酬額を正規化: 空文字、null、0 はすべて null（報酬なし）として扱う
+        // 報酬額を正規化: 空文字、null、0 はすべて 0（報酬なし）として扱う
+        // データベースの reward_amount カラムは default(0) のため、一貫性を保つ
         $rawReward = $request->input('reward_amount');
         if ($rawReward === '' || $rawReward === null || $rawReward === 0 || $rawReward === '0') {
-            $normalizedReward = null;
+            $normalizedReward = 0;
         } else {
             $normalizedReward = (int) $rawReward;
         }
@@ -167,8 +168,12 @@ class PostController extends Controller
             'reward_amount' => [
                 'nullable',
                 'integer',
-                'min:' . $minReward,
-                'max:' . $maxReward,
+                function ($attribute, $value, $fail) use ($minReward, $maxReward) {
+                    // 0（報酬なし）または minReward 〜 maxReward の範囲を許可
+                    if ($value !== 0 && $value !== null && ($value < $minReward || $value > $maxReward)) {
+                        $fail("報酬金額は{$minReward}円から{$maxReward}円の間で設定してください。");
+                    }
+                },
             ],
             'payment_method_id' => 'nullable|string',
         ]);
@@ -197,10 +202,20 @@ class PostController extends Controller
                     ],
                 ]);
                 
-                if ($paymentIntent->status !== 'succeeded') {
+                // 3Dセキュアなどの追加認証が必要な場合は、その情報をフロントエンドに返す
+                if ($paymentIntent->status === 'requires_action' || $paymentIntent->status === 'requires_confirmation') {
+                    return response()->json([
+                        'message' => '追加の認証が必要です。',
+                        'error' => 'requires_action',
+                        'payment_intent_client_secret' => $paymentIntent->client_secret,
+                        'payment_intent_id' => $paymentIntent->id,
+                        'status' => $paymentIntent->status,
+                    ], 400);
+                } elseif ($paymentIntent->status !== 'succeeded') {
                     return response()->json([
                         'message' => '決済に失敗しました。カード情報を確認してください。',
                         'error' => 'payment_failed',
+                        'status' => $paymentIntent->status,
                     ], 400);
                 }
                 
@@ -217,12 +232,21 @@ class PostController extends Controller
                     'error' => 'card_error',
                 ], 400);
             } catch (\Exception $e) {
-                // 詳細なエラーはサーバーログに記録する
-                Log::error('Payment processing error', [
+                // 本番環境ではスタックトレースをログに記録しない
+                $logContext = [
                     'user_id' => $user->id,
-                    'exception' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
+                    'exception_class' => get_class($e),
+                    'message' => $e->getMessage(),
+                    'file' => basename($e->getFile()),
+                    'line' => $e->getLine(),
+                ];
+                
+                // デバッグモード時のみスタックトレースを記録
+                if (config('app.debug')) {
+                    $logContext['trace'] = $e->getTraceAsString();
+                }
+                
+                Log::error('Payment processing error', $logContext);
                 return response()->json([
                     'message' => '決済処理中にエラーが発生しました。しばらくしてからもう一度お試しください。',
                     'error' => 'payment_error',

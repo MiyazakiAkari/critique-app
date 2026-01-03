@@ -57,12 +57,19 @@ const emit = defineEmits<{
   'update:modelValue': [value: number];
 }>();
 
-const MAX_REWARD_AMOUNT = 10000;
+const envMaxRewardAmount = Number(import.meta.env.VITE_MAX_REWARD_AMOUNT);
+const MAX_REWARD_AMOUNT = Number.isFinite(envMaxRewardAmount) && envMaxRewardAmount > 0 ? envMaxRewardAmount : 10000;
 
+/**
+ * 報酬額を 0 〜 MAX_REWARD_AMOUNT の範囲に制限する
+ * NaN, Infinity, undefined などの無効な値は 0 を返す
+ */
 const clampRewardAmount = (value: number | undefined): number => {
+  // 無効な値は早期リターンで 0 を返す
   if (!Number.isFinite(value ?? NaN)) {
     return 0;
   }
+  // 有限な値のみここに到達する
   return Math.min(Math.max(Math.round(value as number), 0), MAX_REWARD_AMOUNT);
 };
 
