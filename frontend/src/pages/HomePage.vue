@@ -544,13 +544,20 @@ interface Critique {
   };
 }
 
-const MAX_REWARD_AMOUNT = 10000;
+const envMaxRewardAmount = Number(import.meta.env.VITE_MAX_REWARD_AMOUNT);
+const MAX_REWARD_AMOUNT = Number.isFinite(envMaxRewardAmount) && envMaxRewardAmount > 0 ? envMaxRewardAmount : 10000;
 const rewardPresets = [500, 1000, 3000, 5000, MAX_REWARD_AMOUNT];
 
+/**
+ * 報酬額を 0 〜 MAX_REWARD_AMOUNT の範囲に制限する
+ * NaN, Infinity, -Infinity などの無効な値は 0 を返す
+ */
 const clampRewardAmount = (value: number): number => {
+  // 無効な値は早期リターンで 0 を返す
   if (!Number.isFinite(value)) {
     return 0;
   }
+  // 有限な値のみここに到達する
   return Math.min(Math.max(Math.round(value), 0), MAX_REWARD_AMOUNT);
 };
 
@@ -682,9 +689,23 @@ const handlePostClick = () => {
 const handlePaymentCompleted = async (paymentMethodId: string, _extra?: any) => {
   try {
     // paymentMethodIdのバリデーション
-    if (!paymentMethodId || typeof paymentMethodId !== 'string' || !paymentMethodId.startsWith('pm_')) {
-      console.error('Invalid paymentMethodId received:', paymentMethodId, _extra);
-      error.value = '決済情報が正しく取得できませんでした。もう一度お試しください。';
+    if (!paymentMethodId) {
+      console.error('PaymentMethodId is empty or undefined:', paymentMethodId, _extra);
+      error.value = '決済情報が取得できませんでした。カード情報を入力してもう一度お試しください。';
+      showPaymentModal.value = false;
+      return;
+    }
+    
+    if (typeof paymentMethodId !== 'string') {
+      console.error('PaymentMethodId is not a string:', typeof paymentMethodId, paymentMethodId, _extra);
+      error.value = '決済情報の形式が不正です。ページを再読み込みしてお試しください。';
+      showPaymentModal.value = false;
+      return;
+    }
+    
+    if (!paymentMethodId.startsWith('pm_')) {
+      console.error('PaymentMethodId has invalid format (should start with pm_):', paymentMethodId, _extra);
+      error.value = '決済処理で予期しないエラーが発生しました。別のカードをお試しいただくか、サポートにお問い合わせください。';
       showPaymentModal.value = false;
       return;
     }
