@@ -253,41 +253,8 @@
               <div v-if="post.image_url" class="mt-3 rounded-2xl overflow-hidden border border-gray-200 cursor-pointer" @click="openImageModal(post.image_url)">
                 <img :src="post.image_url" alt="投稿画像" class="w-full max-h-96 object-cover hover:opacity-95 transition" />
               </div>
-              
-              <!-- 一番上の添削を常に表示 -->
-              <div v-if="!expandedPosts.has(post.id) && (post.first_critique || critiquesMap[post.id]?.[0])" class="mt-3 border-t border-gray-200 pt-3">
-                <div class="flex space-x-2 pl-2 border-l-2 border-blue-200">
-                  <div class="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0"></div>
-                  <div class="flex-1">
-                    <div class="flex items-center space-x-2">
-                      <span class="font-semibold text-sm text-gray-900">{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.user.name }}</span>
-                      <span class="text-gray-500 text-sm">@{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.user.username }}</span>
-                      <span class="text-gray-500 text-sm">·</span>
-                      <span class="text-gray-500 text-sm">{{ (critiquesMap[post.id]?.[0] || post.first_critique) ? formatRelativeTime((critiquesMap[post.id]?.[0] || post.first_critique)!.created_at) : '' }}</span>
-                    </div>
-                    <p class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.content }}</p>
-                    <button 
-                      v-if="(post.critiques_count ?? 0) > 1"
-                      @click.stop="togglePostExpansion(post.id)"
-                      class="text-sm text-blue-500 hover:underline mt-1"
-                    >
-                      他の添削を見る ({{ (post.critiques_count ?? 1) - 1 }}件)
-                    </button>
-                  </div>
-                </div>
-              </div>
 
               <div class="flex justify-between mt-3 max-w-md text-gray-500">
-                <button 
-                  @click="togglePostExpansion(post.id)"
-                  class="flex items-center space-x-2 hover:text-blue-500 group"
-                >
-                  <svg class="w-5 h-5 group-hover:bg-blue-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                  </svg>
-                  <span class="text-sm">{{ critiquesMap[post.id]?.length ?? post.critiques_count ?? 0 }}</span>
-                </button>
-                
                 <button 
                   @click="toggleRepost(post.id, post)"
                   :class="['flex items-center space-x-2 group', post.is_reposted ? 'text-green-500' : 'hover:text-green-500']"
@@ -311,6 +278,43 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
                   </svg>
                 </button>
+              </div>
+              
+              <!-- 添削を見るリンク（展開されていない時） -->
+              <div v-if="!expandedPosts.has(post.id)" class="mt-3">
+                <button 
+                  @click="togglePostExpansion(post.id)"
+                  class="text-sm text-blue-500 hover:text-blue-600 hover:underline flex items-center space-x-1"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                  </svg>
+                  <span v-if="(critiquesMap[post.id]?.length ?? post.critiques_count ?? 0) === 0">添削する</span>
+                  <span v-else>添削を見る ({{ critiquesMap[post.id]?.length ?? post.critiques_count ?? 0 }}件)</span>
+                </button>
+              </div>
+              
+              <!-- 一番上の添削を常に表示 -->
+              <div v-if="!expandedPosts.has(post.id) && (post.first_critique || critiquesMap[post.id]?.[0])" class="mt-3 border-t border-gray-200 pt-3">
+                <div class="flex space-x-2 pl-2 border-l-2 border-blue-200">
+                  <div class="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0"></div>
+                  <div class="flex-1">
+                    <div class="flex items-center space-x-2">
+                      <span class="font-semibold text-sm text-gray-900">{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.user.name }}</span>
+                      <span class="text-gray-500 text-sm">@{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.user.username }}</span>
+                      <span class="text-gray-500 text-sm">·</span>
+                      <span class="text-gray-500 text-sm">{{ (critiquesMap[post.id]?.[0] || post.first_critique) ? formatRelativeTime((critiquesMap[post.id]?.[0] || post.first_critique)!.created_at) : '' }}</span>
+                    </div>
+                    <p class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">{{ (critiquesMap[post.id]?.[0] || post.first_critique)?.content }}</p>
+                    <button 
+                      v-if="(post.critiques_count ?? 0) > 1"
+                      @click.stop="togglePostExpansion(post.id)"
+                      class="text-sm text-blue-500 hover:underline mt-1"
+                    >
+                      他の添削を見る ({{ (post.critiques_count ?? 1) - 1 }}件)
+                    </button>
+                  </div>
+                </div>
               </div>
               
               <!-- 添削エリア（展開時） -->
@@ -369,6 +373,33 @@
                         </div>
                       </div>
                       <p class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">{{ critique.content }}</p>
+                      
+                      <!-- いいねボタン -->
+                      <div class="flex items-center mt-2">
+                        <button 
+                          @click.stop="toggleCritiqueLike(post.id, critique)"
+                          :disabled="likingCritiqueIds.has(critique.id) || (authUser && authUser.id === critique.user.id)"
+                          :class="[
+                            'flex items-center space-x-1 text-sm transition',
+                            authUser && authUser.id === critique.user.id 
+                              ? 'text-gray-300 cursor-not-allowed' 
+                              : critique.is_liked 
+                                ? 'text-pink-500' 
+                                : 'text-gray-400 hover:text-pink-500 group'
+                          ]"
+                          :title="authUser && authUser.id === critique.user.id ? '自分の添削にはいいねできません' : critique.is_liked ? 'いいねを取り消す' : 'いいね'"
+                        >
+                          <svg 
+                            class="w-4 h-4 group-hover:scale-110 transition-transform" 
+                            :fill="critique.is_liked ? 'currentColor' : 'none'" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                          </svg>
+                          <span>{{ critique.likes_count || 0 }}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -589,6 +620,8 @@ interface Critique {
     name: string;
     username: string;
   };
+  likes_count: number;
+  is_liked: boolean;
 }
 
 const envMaxRewardAmount = Number(import.meta.env.VITE_MAX_REWARD_AMOUNT);
@@ -660,6 +693,7 @@ const critiqueContent = ref<Record<number, string>>({});
 const submittingCritique = ref<Record<number, boolean>>({});
 const openCritiqueMenuId = ref<number | null>(null);
 const openPostMenuId = ref<number | null>(null);
+const likingCritiqueIds = ref<Set<number>>(new Set());
 
 // 認証状態（集中管理から取得）
 const authUser = authUserState;
@@ -967,6 +1001,38 @@ const toggleCritiqueMenu = (critiqueId: number) => {
     openCritiqueMenuId.value = null;
   } else {
     openCritiqueMenuId.value = critiqueId;
+  }
+};
+
+// 添削にいいね/いいね解除する
+const toggleCritiqueLike = async (postId: number, critique: Critique) => {
+  if (!authUser.value) {
+    // 未ログインの場合はログインページへリダイレクト
+    return;
+  }
+
+  if (likingCritiqueIds.value.has(critique.id)) {
+    return; // 既に処理中
+  }
+
+  likingCritiqueIds.value.add(critique.id);
+
+  try {
+    if (critique.is_liked) {
+      // いいね解除
+      const response = await api.delete(`/posts/${postId}/critiques/${critique.id}/like`);
+      critique.is_liked = false;
+      critique.likes_count = response.data.likes_count;
+    } else {
+      // いいね
+      const response = await api.post(`/posts/${postId}/critiques/${critique.id}/like`);
+      critique.is_liked = true;
+      critique.likes_count = response.data.likes_count;
+    }
+  } catch (e: any) {
+    console.error('Failed to toggle critique like:', e);
+  } finally {
+    likingCritiqueIds.value.delete(critique.id);
   }
 };
 

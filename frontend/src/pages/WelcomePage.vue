@@ -36,7 +36,7 @@
           <span class="text-blue-600">もっと良く</span>する場所
         </h2>
         <p class="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-          Critiqueは、クリエイターが作品を投稿し、プロから的確なフィードバックを受けられるプラットフォームです。
+          Critiqueは、クリエイターが作品を投稿し、様々な人からフィードバックを受けられるプラットフォームです。
         </p>
         <router-link 
           to="/register" 
