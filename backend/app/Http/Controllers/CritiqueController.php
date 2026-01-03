@@ -15,16 +15,31 @@ class CritiqueController extends Controller
      */
     public function index(Post $post): JsonResponse
     {
-        $critiques = $post->critiques()
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        $query = $post->critiques()
             ->with('user:id,name,username')
+            ->withCount('likes');
+
+        // ログインユーザーがいる場合、いいね済みかどうかをEager Loadする
+        if ($user) {
+            $query->withExists(['likes as is_liked' => function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            }]);
+        }
+
+        $critiques = $query
             ->orderBy('created_at', 'asc')
             ->get()
-            ->map(function ($critique) {
+            ->map(function ($critique) use ($user) {
                 return [
                     'id' => $critique->id,
                     'content' => $critique->content,
                     'created_at' => $critique->created_at->toISOString(),
                     'user' => $critique->user->only(['id', 'name', 'username']),
+                    'likes_count' => $critique->likes_count,
+                    'is_liked' => $user ? (bool) $critique->is_liked : false,
                 ];
             });
 
@@ -55,6 +70,8 @@ class CritiqueController extends Controller
             'content' => $critique->content,
             'created_at' => $critique->created_at->toISOString(),
             'user' => $critique->user->only(['id', 'name', 'username']),
+            'likes_count' => 0,
+            'is_liked' => false,
         ], 201);
     }
 
@@ -83,5 +100,81 @@ class CritiqueController extends Controller
         $critique->delete();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * 添削にいいねする
+     */
+    public function like(Post $post, Critique $critique): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 添削が指定された投稿に属していることを確認
+        if ($critique->post_id !== $post->id) {
+            return response()->json([
+                'message' => '添削が見つかりません',
+            ], 404);
+        }
+
+        // 自分の添削にはいいねできない
+        if ($critique->user_id === $user->id) {
+            return response()->json([
+                'message' => '自分の添削にはいいねできません',
+            ], 403);
+        }
+
+        // いいね数を事前にロード
+        $critique->loadCount('likes');
+
+        // 既にいいねしているかチェック
+        if ($critique->isLikedBy($user)) {
+            return response()->json([
+                'message' => '既にいいねしています',
+            ], 409);
+        }
+
+        $critique->likes()->create([
+            'user_id' => $user->id,
+        ]);
+
+        return response()->json([
+            'likes_count' => $critique->likes_count + 1,
+            'is_liked' => true,
+        ], 201);
+    }
+
+    /**
+     * 添削のいいねを解除する
+     */
+    public function unlike(Post $post, Critique $critique): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 添削が指定された投稿に属していることを確認
+        if ($critique->post_id !== $post->id) {
+            return response()->json([
+                'message' => '添削が見つかりません',
+            ], 404);
+        }
+
+        // いいね数を事前にロード
+        $critique->loadCount('likes');
+
+        $like = $critique->likes()->where('user_id', $user->id)->first();
+
+        if (!$like) {
+            return response()->json([
+                'message' => 'いいねしていません',
+            ], 404);
+        }
+
+        $like->delete();
+
+        return response()->json([
+            'likes_count' => $critique->likes_count - 1,
+            'is_liked' => false,
+        ], 200);
     }
 }

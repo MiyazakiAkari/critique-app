@@ -230,4 +230,233 @@ class CritiqueTest extends TestCase
         $this->assertDatabaseMissing('critiques', ['id' => $critique1->id]);
         $this->assertDatabaseMissing('critiques', ['id' => $critique2->id]);
     }
+
+    /**
+     * 認証済みユーザーは添削にいいねできる
+     */
+    public function test_authenticated_user_can_like_critique(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        $critiqueAuthor = User::factory()->create();
+        $critique = Critique::factory()->create([
+            'post_id' => $post->id,
+            'user_id' => $critiqueAuthor->id,
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        $response->assertStatus(201)
+            ->assertJsonPath('is_liked', true)
+            ->assertJsonPath('likes_count', 1);
+
+        $this->assertDatabaseHas('critique_likes', [
+            'critique_id' => $critique->id,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /**
+     * ユーザーは自分の添削にいいねできない
+     */
+    public function test_user_cannot_like_own_critique(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        $critique = Critique::factory()->create([
+            'post_id' => $post->id,
+            'user_id' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        $response->assertStatus(403)
+            ->assertJsonPath('message', '自分の添削にはいいねできません');
+
+        $this->assertDatabaseMissing('critique_likes', [
+            'critique_id' => $critique->id,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /**
+     * ユーザーは同じ添削に2回いいねできない
+     */
+    public function test_user_cannot_like_critique_twice(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        $critiqueAuthor = User::factory()->create();
+        $critique = Critique::factory()->create([
+            'post_id' => $post->id,
+            'user_id' => $critiqueAuthor->id,
+        ]);
+
+        // 1回目のいいね
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        // 2回目のいいね
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        $response->assertStatus(409)
+            ->assertJsonPath('message', '既にいいねしています');
+    }
+
+    /**
+     * 認証済みユーザーはいいねを解除できる
+     */
+    public function test_authenticated_user_can_unlike_critique(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        $critiqueAuthor = User::factory()->create();
+        $critique = Critique::factory()->create([
+            'post_id' => $post->id,
+            'user_id' => $critiqueAuthor->id,
+        ]);
+
+        // まずいいねする
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        // いいね解除
+        $response = $this->actingAs($user, 'sanctum')
+            ->deleteJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('is_liked', false)
+            ->assertJsonPath('likes_count', 0);
+
+        $this->assertDatabaseMissing('critique_likes', [
+            'critique_id' => $critique->id,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /**
+     * いいねしていない添削のいいねを解除しようとすると404
+     */
+    public function test_cannot_unlike_critique_not_liked(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        $critique = Critique::factory()->create(['post_id' => $post->id]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->deleteJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        $response->assertStatus(404)
+            ->assertJsonPath('message', 'いいねしていません');
+    }
+
+    /**
+     * 未認証ユーザーは添削にいいねできない
+     */
+    public function test_unauthenticated_user_cannot_like_critique(): void
+    {
+        $post = Post::factory()->create();
+        $critique = Critique::factory()->create(['post_id' => $post->id]);
+
+        $response = $this->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        $response->assertStatus(401);
+    }
+
+    /**
+     * 未認証ユーザーはいいねを解除できない
+     */
+    public function test_unauthenticated_user_cannot_unlike_critique(): void
+    {
+        $post = Post::factory()->create();
+        $critique = Critique::factory()->create(['post_id' => $post->id]);
+
+        $response = $this->deleteJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        $response->assertStatus(401);
+    }
+
+    /**
+     * 添削一覧取得時にいいね数といいね状態が含まれる
+     */
+    public function test_critiques_include_likes_count_and_is_liked(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        $critiqueAuthor = User::factory()->create();
+        $critique = Critique::factory()->create([
+            'post_id' => $post->id,
+            'user_id' => $critiqueAuthor->id,
+        ]);
+
+        // いいねする
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        // 添削一覧を取得（認証済み）
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/posts/{$post->id}/critiques");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('0.likes_count', 1)
+            ->assertJsonPath('0.is_liked', true);
+    }
+
+    /**
+     * 未認証時の添削一覧ではis_likedはfalse
+     */
+    public function test_critiques_show_is_liked_false_for_unauthenticated(): void
+    {
+        $critiqueAuthor = User::factory()->create();
+        $post = Post::factory()->create();
+        $critique = Critique::factory()->create([
+            'post_id' => $post->id,
+            'user_id' => $critiqueAuthor->id,
+        ]);
+
+        // 他のユーザーがいいね
+        $otherUser = User::factory()->create();
+        $this->actingAs($otherUser, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        // 未認証で添削一覧を取得（明示的にゲストとして実行）
+        $this->app->get('auth')->forgetGuards();
+        $response = $this->getJson("/api/posts/{$post->id}/critiques");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('0.likes_count', 1)
+            ->assertJsonPath('0.is_liked', false);
+    }
+
+    /**
+     * 添削が削除されるといいねも削除される（カスケード）
+     */
+    public function test_likes_are_deleted_when_critique_is_deleted(): void
+    {
+        $user = User::factory()->create();
+        $critiqueAuthor = User::factory()->create();
+        $post = Post::factory()->create();
+        $critique = Critique::factory()->create([
+            'post_id' => $post->id,
+            'user_id' => $critiqueAuthor->id,
+        ]);
+
+        // いいねする
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques/{$critique->id}/like");
+
+        $this->assertDatabaseHas('critique_likes', [
+            'critique_id' => $critique->id,
+        ]);
+
+        // 添削を削除
+        $critique->delete();
+
+        $this->assertDatabaseMissing('critique_likes', [
+            'critique_id' => $critique->id,
+        ]);
+    }
 }

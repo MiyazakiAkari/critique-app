@@ -86,6 +86,10 @@ Route::get('/posts/{post}/critiques', [CritiqueController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/posts/{post}/critiques', [CritiqueController::class, 'store']);
     Route::delete('/posts/{post}/critiques/{critique}', [CritiqueController::class, 'destroy']);
+    
+    // 添削いいね操作
+    Route::post('/posts/{post}/critiques/{critique}/like', [CritiqueController::class, 'like']);
+    Route::delete('/posts/{post}/critiques/{critique}/like', [CritiqueController::class, 'unlike']);
 });
 
 // Stripe決済関連（認証必須）
