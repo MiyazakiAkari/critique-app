@@ -69,14 +69,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '../utils/axios'
+import { isLoggedIn, clearAuth } from '../utils/auth'
 
 const router = useRouter()
 const route = useRoute()
-
-const isLoggedIn = computed(() => !!localStorage.getItem('auth_token'))
 
 const goToProfile = () => {
   const authUser = JSON.parse(localStorage.getItem('auth_user') || '{}')
@@ -93,8 +91,7 @@ const logout = async () => {
   } catch (e) {
     // エラーでも続行
   } finally {
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('auth_user')
+    clearAuth()
     router.push('/')
   }
 }

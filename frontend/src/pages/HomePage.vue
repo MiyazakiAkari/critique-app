@@ -551,6 +551,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import api from '../utils/axios';
+import { isLoggedIn as authIsLoggedIn, authUser as authUserState } from '../utils/auth';
 import SidebarMenu from '../components/SidebarMenu.vue';
 import RewardBadge from '../components/RewardBadge.vue';
 import PaymentModal from '../components/PaymentModal.vue';
@@ -659,7 +660,10 @@ const critiqueContent = ref<Record<number, string>>({});
 const submittingCritique = ref<Record<number, boolean>>({});
 const openCritiqueMenuId = ref<number | null>(null);
 const openPostMenuId = ref<number | null>(null);
-const authUser = ref<{ id: number; name: string; username: string } | null>(null);
+
+// 認証状態（集中管理から取得）
+const authUser = authUserState;
+const isLoggedIn = authIsLoggedIn;
 
 // リポスト機能
 const repostingPostIds = ref<Set<number>>(new Set());
@@ -1022,9 +1026,6 @@ const confirmDelete = async () => {
   }
 };
 
-// ログイン状態を確認
-const isLoggedIn = computed(() => !!authUser.value);
-
 // タブ切り替え時にデータを取得
 const handleTabChange = async (tab: 'recommended' | 'following') => {
   activeTab.value = tab;
@@ -1137,11 +1138,6 @@ const closeMenuOnOutsideClick = (event: MouseEvent) => {
 
 // 初回マウント時にデータを取得
 onMounted(async () => {
-  // 認証ユーザー情報を取得
-  const userStr = localStorage.getItem('auth_user');
-  if (userStr) {
-    authUser.value = JSON.parse(userStr);
-  }
   await fetchRecommendedPosts();
   
   // 外部クリックリスナーを登録
