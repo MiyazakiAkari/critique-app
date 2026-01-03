@@ -581,11 +581,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import api from '../utils/axios';
 import { isLoggedIn as authIsLoggedIn, authUser as authUserState } from '../utils/auth';
 import SidebarMenu from '../components/SidebarMenu.vue';
 import RewardBadge from '../components/RewardBadge.vue';
 import PaymentModal from '../components/PaymentModal.vue';
+
+const router = useRouter();
 
 // Stripe公開キー
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
@@ -1008,6 +1011,7 @@ const toggleCritiqueMenu = (critiqueId: number) => {
 const toggleCritiqueLike = async (postId: number, critique: Critique) => {
   if (!authUser.value) {
     // 未ログインの場合はログインページへリダイレクト
+    router.push('/login');
     return;
   }
 

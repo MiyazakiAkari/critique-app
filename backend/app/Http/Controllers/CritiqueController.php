@@ -18,9 +18,18 @@ class CritiqueController extends Controller
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
 
-        $critiques = $post->critiques()
+        $query = $post->critiques()
             ->with('user:id,name,username')
-            ->withCount('likes')
+            ->withCount('likes');
+
+        // ログインユーザーがいる場合、いいね済みかどうかをEager Loadする
+        if ($user) {
+            $query->withExists(['likes as is_liked' => function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            }]);
+        }
+
+        $critiques = $query
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($critique) use ($user) {
@@ -30,7 +39,7 @@ class CritiqueController extends Controller
                     'created_at' => $critique->created_at->toISOString(),
                     'user' => $critique->user->only(['id', 'name', 'username']),
                     'likes_count' => $critique->likes_count,
-                    'is_liked' => $critique->isLikedBy($user),
+                    'is_liked' => $user ? (bool) $critique->is_liked : false,
                 ];
             });
 
@@ -115,6 +124,9 @@ class CritiqueController extends Controller
             ], 403);
         }
 
+        // いいね数を事前にロード
+        $critique->loadCount('likes');
+
         // 既にいいねしているかチェック
         if ($critique->isLikedBy($user)) {
             return response()->json([
@@ -127,7 +139,7 @@ class CritiqueController extends Controller
         ]);
 
         return response()->json([
-            'likes_count' => $critique->likes()->count(),
+            'likes_count' => $critique->likes_count + 1,
             'is_liked' => true,
         ], 201);
     }
@@ -147,6 +159,9 @@ class CritiqueController extends Controller
             ], 404);
         }
 
+        // いいね数を事前にロード
+        $critique->loadCount('likes');
+
         $like = $critique->likes()->where('user_id', $user->id)->first();
 
         if (!$like) {
@@ -158,7 +173,7 @@ class CritiqueController extends Controller
         $like->delete();
 
         return response()->json([
-            'likes_count' => $critique->likes()->count(),
+            'likes_count' => $critique->likes_count - 1,
             'is_liked' => false,
         ], 200);
     }
