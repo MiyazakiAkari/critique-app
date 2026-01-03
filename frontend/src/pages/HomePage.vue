@@ -32,8 +32,8 @@
         </div>
       </div>
 
-      <!-- 投稿フォーム -->
-      <div class="border-b border-gray-200 p-4">
+      <!-- 投稿フォーム（ログイン時のみ表示） -->
+      <div v-if="authUser" class="border-b border-gray-200 p-4">
         <div class="flex space-x-3">
           <div class="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
           <div class="flex-1">
@@ -130,6 +130,27 @@
         </div>
       </div>
 
+      <!-- 未ログイン時のバナー -->
+      <div v-else class="border-b border-gray-200 p-4 bg-blue-50">
+        <div class="text-center">
+          <p class="text-gray-700 mb-3">投稿するにはログインが必要です</p>
+          <div class="flex justify-center space-x-3">
+            <router-link 
+              to="/login" 
+              class="px-4 py-2 text-blue-600 border border-blue-600 rounded-full font-medium hover:bg-blue-100 transition"
+            >
+              ログイン
+            </router-link>
+            <router-link 
+              to="/register" 
+              class="px-4 py-2 bg-blue-500 text-white rounded-full font-medium hover:bg-blue-600 transition"
+            >
+              新規登録
+            </router-link>
+          </div>
+        </div>
+      </div>
+
       <!-- タイムライン -->
       <div>
         <div v-if="loading" class="p-8 text-center">
@@ -138,6 +159,31 @@
 
         <div v-else-if="error" class="p-8 text-center text-red-600">
           {{ error }}
+        </div>
+
+        <!-- フォロー中タブで未ログイン時 -->
+        <div v-else-if="activeTab === 'following' && !isLoggedIn" class="p-8 text-center">
+          <div class="max-w-sm mx-auto">
+            <svg class="w-20 h-20 mx-auto mb-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">ログインしてフォローしよう</h3>
+            <p class="text-gray-500 mb-6">ログインすると、フォローしたユーザーの投稿をタイムラインで見ることができます。</p>
+            <div class="flex justify-center space-x-3">
+              <router-link 
+                to="/login" 
+                class="px-6 py-2.5 text-blue-600 border border-blue-600 rounded-full font-semibold hover:bg-blue-50 transition"
+              >
+                ログイン
+              </router-link>
+              <router-link 
+                to="/register" 
+                class="px-6 py-2.5 bg-blue-500 text-white rounded-full font-semibold hover:bg-blue-600 transition"
+              >
+                新規登録
+              </router-link>
+            </div>
+          </div>
         </div>
 
         <div v-else-if="displayPosts.length === 0" class="p-8 text-center text-gray-500">
@@ -976,13 +1022,19 @@ const confirmDelete = async () => {
   }
 };
 
+// ログイン状態を確認
+const isLoggedIn = computed(() => !!authUser.value);
+
 // タブ切り替え時にデータを取得
 const handleTabChange = async (tab: 'recommended' | 'following') => {
   activeTab.value = tab;
   if (tab === 'recommended') {
     await fetchRecommendedPosts();
   } else if (tab === 'following') {
-    await fetchTimeline();
+    // ログインしていない場合はタイムラインを取得しない
+    if (isLoggedIn.value) {
+      await fetchTimeline();
+    }
   }
 };
 
@@ -1105,6 +1157,7 @@ onUnmounted(() => {
 defineExpose({
   // タブ・表示状態
   activeTab,
+  isLoggedIn,
   // 投稿データ
   recommendedPosts,
   followingPosts,

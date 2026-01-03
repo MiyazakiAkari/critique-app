@@ -18,6 +18,11 @@
       </form>
 
       <p class="text-red-600 text-center mt-4">{{ error }}</p>
+      
+      <p class="text-center mt-4 text-gray-600">
+        アカウントをお持ちでない方は
+        <router-link to="/register" class="text-blue-600 hover:underline font-medium">新規登録</router-link>
+      </p>
     </div>
   </div>
 </template>

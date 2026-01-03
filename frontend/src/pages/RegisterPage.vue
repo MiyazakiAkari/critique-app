@@ -28,6 +28,11 @@
       </form>
 
       <p class="text-red-600 text-center mt-4">{{ error }}</p>
+      
+      <p class="text-center mt-4 text-gray-600">
+        すでにアカウントをお持ちの方は
+        <router-link to="/login" class="text-blue-600 hover:underline font-medium">ログイン</router-link>
+      </p>
     </div>
   </div>
 </template>
