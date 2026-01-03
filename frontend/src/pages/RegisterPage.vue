@@ -28,12 +28,18 @@
       </form>
 
       <p class="text-red-600 text-center mt-4">{{ error }}</p>
+      
+      <p class="text-center mt-4 text-gray-600">
+        すでにアカウントをお持ちの方は
+        <router-link to="/login" class="text-blue-600 hover:underline font-medium">ログイン</router-link>
+      </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import api, { setAuthToken } from "../utils/axios";
+import api from "../utils/axios";
+import { setAuth } from "../utils/auth";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -58,9 +64,9 @@ const register = async () => {
       password_confirmation: password_confirmation.value,
     });
 
-    // トークンを保存
-    if (res.data.token) {
-      setAuthToken(res.data.token);
+    // トークンとユーザー情報を保存
+    if (res.data.token && res.data.user) {
+      setAuth(res.data.token, res.data.user);
     }
 
     // /home に遷移

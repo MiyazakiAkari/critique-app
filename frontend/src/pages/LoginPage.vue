@@ -18,6 +18,11 @@
       </form>
 
       <p class="text-red-600 text-center mt-4">{{ error }}</p>
+      
+      <p class="text-center mt-4 text-gray-600">
+        アカウントをお持ちでない方は
+        <router-link to="/register" class="text-blue-600 hover:underline font-medium">新規登録</router-link>
+      </p>
     </div>
   </div>
 </template>
@@ -25,7 +30,8 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import api, { setAuthToken } from "../utils/axios";
+import api from "../utils/axios";
+import { setAuth } from "../utils/auth";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -49,11 +55,11 @@ const login = async () => {
       throw new Error("Token was not returned from the API");
     }
 
-    setAuthToken(token);
-
-    if (user) {
-      localStorage.setItem("auth_user", JSON.stringify(user));
+    if (!user) {
+      throw new Error("User was not returned from the API");
     }
+
+    setAuth(token, user);
     
     router.push('/home');
 

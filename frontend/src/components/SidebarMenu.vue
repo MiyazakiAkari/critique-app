@@ -51,19 +51,27 @@
           </svg>
           <span>プロフィール</span>
         </a>
+        
+        <!-- ログアウト -->
+        <a 
+          v-if="isLoggedIn"
+          @click="logout" 
+          class="flex items-center space-x-4 px-4 py-3 rounded-full hover:bg-red-50 text-gray-600 hover:text-red-600 cursor-pointer transition"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+          <span>ログアウト</span>
+        </a>
       </nav>
-      
-      <button 
-        class="w-full mt-6 bg-blue-500 text-white py-3 rounded-full font-semibold hover:bg-blue-600 transition"
-      >
-        投稿する
-      </button>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
+import api from '../utils/axios'
+import { isLoggedIn, clearAuth } from '../utils/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -74,6 +82,17 @@ const goToProfile = () => {
     router.push(`/profile/${authUser.username}`)
   } else {
     router.push('/login')
+  }
+}
+
+const logout = async () => {
+  try {
+    await api.post('/logout')
+  } catch (e) {
+    // エラーでも続行
+  } finally {
+    clearAuth()
+    router.push('/')
   }
 }
 
