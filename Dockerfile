@@ -43,8 +43,10 @@ RUN mkdir -p storage/framework/cache \
 
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Copy frontend build
-COPY --from=frontend-builder /frontend/dist ./public
+# Copy frontend build (merge with existing public, don't overwrite index.php)
+COPY --from=frontend-builder /frontend/dist/index.html ./public/index.html
+COPY --from=frontend-builder /frontend/dist/assets ./public/assets
+COPY --from=frontend-builder /frontend/dist/vite.svg ./public/vite.svg
 
 # Generate package manifest and set permissions
 RUN php artisan package:discover --ansi || true \

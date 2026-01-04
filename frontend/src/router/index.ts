@@ -20,3 +20,23 @@ export const router = createRouter({
   history: createWebHistory(),
   routes,
 })
+
+// ナビゲーションガード：ログイン済みユーザーがルートにアクセスした場合は/homeにリダイレクト
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('auth_token')
+  const isLoggedIn = !!token
+  
+  // ログイン済みでWelcomeページにアクセスした場合はHomeにリダイレクト
+  if (isLoggedIn && to.path === '/') {
+    next('/home')
+    return
+  }
+  
+  // ログイン済みでログイン・登録ページにアクセスした場合もHomeにリダイレクト
+  if (isLoggedIn && (to.path === '/login' || to.path === '/register')) {
+    next('/home')
+    return
+  }
+  
+  next()
+})
