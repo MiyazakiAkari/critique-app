@@ -25,6 +25,9 @@ RUN apk add --no-cache \
     libpng-dev \
     libjpeg-turbo-dev \
     freetype-dev \
+    libpng \
+    libjpeg-turbo \
+    freetype \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_pgsql bcmath mbstring fileinfo exif gd
 
@@ -35,6 +38,7 @@ WORKDIR /var/www/html
 
 # Copy backend
 COPY backend .
+RUN rm -f bootstrap/cache/*.php
 
 # Install PHP dependencies (without dev)
 # Create necessary directories first
@@ -57,18 +61,24 @@ COPY --from=frontend-builder /frontend/dist/vite.svg ./public/vite.svg
 # Generate package manifest and set permissions
 RUN php artisan package:discover --ansi || true \
     && chmod -R 777 storage bootstrap/cache \
-    && chown -R nobody:nobody storage bootstrap/cache public /var/lib/nginx /run/nginx
+    && chown -R nobody:nobody storage bootstrap/cache public \
+    && chown -R nginx:nginx /var/lib/nginx /run/nginx \
+    && chmod -R 755 /var/lib/nginx
 
 # Configure Nginx
 COPY nginx/default.conf /etc/nginx/http.d/default.conf
 
 # Configure PHP-FPM to listen on port 9000
-RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/' /usr/local/etc/php-fpm.d/www.conf || true
+RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/' /usr/local/etc/php-fpm.d/www.conf || true \
+    && sed -i 's/;catch_workers_output = yes/catch_workers_output = yes/' /usr/local/etc/php-fpm.d/www.conf || true \
+    && sed -i 's/;decorate_workers_output = no/decorate_workers_output = no/' /usr/local/etc/php-fpm.d/www.conf || true
 
 # Increase upload limits
 RUN echo "upload_max_filesize = 10M" > /usr/local/etc/php/conf.d/uploads.ini \
     && echo "post_max_size = 12M" >> /usr/local/etc/php/conf.d/uploads.ini \
-    && echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/uploads.ini
+    && echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "log_errors = On" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "error_log = /dev/stderr" >> /usr/local/etc/php/conf.d/uploads.ini
 
 # Copy startup script
 COPY start.sh /start.sh
