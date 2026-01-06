@@ -275,6 +275,8 @@ describe('HomePage.vue', () => {
               name: 'Test User',
               username: 'testuser',
             },
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }

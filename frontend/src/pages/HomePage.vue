@@ -378,7 +378,7 @@
                       <div class="flex items-center mt-2">
                         <button 
                           @click.stop="toggleCritiqueLike(post.id, critique)"
-                          :disabled="likingCritiqueIds.has(critique.id) || (authUser && authUser.id === critique.user.id)"
+                          :disabled="likingCritiqueIds.has(critique.id) || authUser?.id === critique.user.id"
                           :class="[
                             'flex items-center space-x-1 text-sm transition',
                             authUser && authUser.id === critique.user.id 

@@ -7,6 +7,7 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend .
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # ========== Stage 2: Laravel with PHP ==========
@@ -37,14 +38,17 @@ RUN mkdir -p storage/framework/cache \
     && mkdir -p storage/framework/sessions \
     && mkdir -p storage/framework/views \
     && mkdir -p storage/logs \
+    && mkdir -p storage/app/public/posts \
     && mkdir -p bootstrap/cache \
     && mkdir -p /var/lib/nginx/logs \
     && mkdir -p /run/nginx
 
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Copy frontend build
-COPY --from=frontend-builder /frontend/dist ./public
+# Copy frontend build (merge with existing public, don't overwrite index.php)
+COPY --from=frontend-builder /frontend/dist/index.html ./public/index.html
+COPY --from=frontend-builder /frontend/dist/assets ./public/assets
+COPY --from=frontend-builder /frontend/dist/vite.svg ./public/vite.svg
 
 # Generate package manifest and set permissions
 RUN php artisan package:discover --ansi || true \
