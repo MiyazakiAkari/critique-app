@@ -22,7 +22,11 @@ RUN apk add --no-cache \
     postgresql-dev \
     linux-headers \
     oniguruma-dev \
-    && docker-php-ext-install pdo pdo_pgsql bcmath mbstring
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql bcmath mbstring fileinfo exif gd
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -60,6 +64,11 @@ COPY nginx/default.conf /etc/nginx/http.d/default.conf
 
 # Configure PHP-FPM to listen on port 9000
 RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/' /usr/local/etc/php-fpm.d/www.conf || true
+
+# Increase upload limits
+RUN echo "upload_max_filesize = 10M" > /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "post_max_size = 12M" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/uploads.ini
 
 # Copy startup script
 COPY start.sh /start.sh
