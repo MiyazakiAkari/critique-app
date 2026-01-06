@@ -38,6 +38,7 @@ RUN mkdir -p storage/framework/cache \
     && mkdir -p storage/framework/sessions \
     && mkdir -p storage/framework/views \
     && mkdir -p storage/logs \
+    && mkdir -p storage/app/public/posts \
     && mkdir -p bootstrap/cache \
     && mkdir -p /var/lib/nginx/logs \
     && mkdir -p /run/nginx
