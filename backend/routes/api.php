@@ -75,6 +75,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // リポスト操作
     Route::post('/posts/{post}/repost', [PostController::class, 'repost']);
     Route::delete('/posts/{post}/repost', [PostController::class, 'unrepost']);
+    
+    // いいね操作
+    Route::post('/posts/{post}/like', [PostController::class, 'like']);
+    Route::delete('/posts/{post}/like', [PostController::class, 'unlike']);
 });
 
 Route::get('/posts/{post}', [PostController::class, 'show']);
