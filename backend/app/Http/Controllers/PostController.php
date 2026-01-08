@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Post;
+use App\Models\PostLike;
 use App\Models\Repost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,12 @@ class PostController extends Controller
             ->toArray();
         $userRepostedPostIdSet = array_flip($userRepostedPostIds);
         
+        // ユーザーがいいねした投稿IDを事前に取得（N+1対策）
+        $userLikedPostIds = PostLike::where('user_id', $user->id)
+            ->pluck('post_id')
+            ->toArray();
+        $userLikedPostIdSet = array_flip($userLikedPostIds);
+        
         // フォロー中のユーザーの直接投稿を取得
         $directPosts = Post::whereIn('user_id', $followingIds)
             ->with('user:id,name,username')
@@ -43,9 +50,10 @@ class PostController extends Controller
             ->withCount('critiques')
             ->withCount('likes')
             ->get()
-            ->map(function ($post) use ($userRepostedPostIdSet) {
+            ->map(function ($post) use ($userRepostedPostIdSet, $userLikedPostIdSet) {
                 $post->display_at = $post->created_at;
                 $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
+                $post->is_liked_by_user = isset($userLikedPostIdSet[$post->id]);
                 return $post;
             });
         
@@ -64,10 +72,11 @@ class PostController extends Controller
                     ->withCount('likes');
             }])
             ->get()
-            ->map(function ($repost) use ($userRepostedPostIdSet) {
+            ->map(function ($repost) use ($userRepostedPostIdSet, $userLikedPostIdSet) {
                 $post = $repost->post;
                 $post->display_at = $repost->created_at;
                 $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
+                $post->is_liked_by_user = isset($userLikedPostIdSet[$post->id]);
                 return $post;
             });
         
@@ -109,6 +118,15 @@ class PostController extends Controller
                 ->toArray();
             $userRepostedPostIdSet = array_flip($userRepostedPostIds);
         }
+        
+        // ユーザーがいいねした投稿IDを事前に取得（N+1対策）
+        $userLikedPostIdSet = [];
+        if ($user) {
+            $userLikedPostIds = PostLike::where('user_id', $user->id)
+                ->pluck('post_id')
+                ->toArray();
+            $userLikedPostIdSet = array_flip($userLikedPostIds);
+        }
 
         $posts = Post::with('user:id,name,username')
             ->with(['critiques' => function ($query) {
@@ -123,8 +141,9 @@ class PostController extends Controller
             ->orderBy('created_at', 'desc')
             ->limit(50)
             ->get()
-            ->map(function ($post) use ($user, $userRepostedPostIdSet) {
+            ->map(function ($post) use ($user, $userRepostedPostIdSet, $userLikedPostIdSet) {
                 $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
+                $post->is_liked_by_user = isset($userLikedPostIdSet[$post->id]);
                 return $this->formatPost($post, $user);
             });
 
@@ -347,6 +366,15 @@ class PostController extends Controller
                 ->toArray();
             $userRepostedPostIdSet = array_flip($userRepostedPostIds);
         }
+        
+        // ユーザーがいいねした投稿IDを事前に取得（N+1対策）
+        $userLikedPostIdSet = [];
+        if ($currentUser) {
+            $userLikedPostIds = PostLike::where('user_id', $currentUser->id)
+                ->pluck('post_id')
+                ->toArray();
+            $userLikedPostIdSet = array_flip($userLikedPostIds);
+        }
 
         $posts = Post::where('user_id', $user->id)
             ->with('user:id,name,username')
@@ -354,8 +382,9 @@ class PostController extends Controller
             ->withCount('likes')
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($post) use ($currentUser, $userRepostedPostIdSet) {
+            ->map(function ($post) use ($currentUser, $userRepostedPostIdSet, $userLikedPostIdSet) {
                 $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
+                $post->is_liked_by_user = isset($userLikedPostIdSet[$post->id]);
                 return $this->formatPost($post, $currentUser);
             });
 
@@ -481,7 +510,7 @@ class PostController extends Controller
         $critiques_count = $post->critiques_count ?? 0;
         $likes_count = $post->likes_count ?? 0;
         $isReposted = $post->user_reposted ?? false;
-        $isLiked = $post->isLikedBy($user);
+        $isLiked = $post->is_liked_by_user ?? $post->isLikedBy($user);
 
         // ストレージ URL を構築（config から取得）
         $image_url = null;
