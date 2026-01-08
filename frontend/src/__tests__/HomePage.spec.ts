@@ -58,6 +58,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -102,6 +104,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -146,6 +150,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -193,6 +199,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -247,6 +255,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -434,6 +444,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -500,6 +512,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -551,6 +565,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -602,6 +618,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 2,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -650,6 +668,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 3,
             is_reposted: true,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -696,6 +716,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 3,
             is_reposted: true,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -742,6 +764,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 0,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -798,6 +822,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 3,
             is_reposted: true,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -849,6 +875,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 2,
             is_reposted: false,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
@@ -906,6 +934,8 @@ describe('HomePage.vue', () => {
             },
             reposts_count: 5,
             is_reposted: true,
+            likes_count: 0,
+            is_liked: false,
           },
         ],
       }
