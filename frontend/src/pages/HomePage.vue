@@ -266,11 +266,23 @@
                   <span class="text-sm">{{ post.reposts_count || 0 }}</span>
                 </button>
                 
-                <button class="flex items-center space-x-2 hover:text-red-500 group">
-                  <svg class="w-5 h-5 group-hover:bg-red-50 rounded-full p-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button 
+                  @click.stop="togglePostLike(post)"
+                  :disabled="likingPostIds.has(post.id)"
+                  :class="[
+                    'flex items-center space-x-2 group',
+                    post.is_liked ? 'text-pink-500' : 'hover:text-pink-500'
+                  ]"
+                >
+                  <svg 
+                    class="w-5 h-5 group-hover:bg-pink-50 rounded-full p-0.5 transition-transform group-hover:scale-110" 
+                    :fill="post.is_liked ? 'currentColor' : 'none'" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
                   </svg>
-                  <span class="text-sm">0</span>
+                  <span class="text-sm">{{ post.likes_count || 0 }}</span>
                 </button>
                 
                 <button class="flex items-center space-x-2 hover:text-blue-500 group">
@@ -606,6 +618,8 @@ interface Post {
   };
   is_reposted: boolean;
   reposts_count: number;
+  likes_count: number;
+  is_liked: boolean;
   critiques_count?: number;
   first_critique?: Critique;
   reward_amount?: number;
@@ -702,6 +716,9 @@ const likingCritiqueIds = ref<Set<number>>(new Set());
 const authUser = authUserState;
 const isLoggedIn = authIsLoggedIn;
 
+// いいね機能
+const likingPostIds = ref<Set<number>>(new Set());
+
 // リポスト機能
 const repostingPostIds = ref<Set<number>>(new Set());
 const showRepostConfirm = ref(false);
@@ -718,6 +735,97 @@ const syncCritiqueCount = (postId: number, delta: number) => {
       updated.add(target);
     }
   });
+};
+
+const togglePostLike = async (post: Post) => {
+  if (!isLoggedIn.value) {
+    router.push('/login');
+    return;
+  }
+
+  if (likingPostIds.value.has(post.id)) return;
+
+  try {
+    likingPostIds.value.add(post.id);
+    
+    // 楽観的更新
+    post.is_liked = !post.is_liked;
+    post.likes_count = (post.likes_count || 0) + (post.is_liked ? 1 : -1);
+    
+    // 他のリストにある同じ投稿も更新
+    [recommendedPosts.value, followingPosts.value].forEach(posts => {
+      const otherPost = posts.find(p => p.id === post.id);
+      if (otherPost && otherPost !== post) {
+        otherPost.is_liked = post.is_liked;
+        otherPost.likes_count = post.likes_count;
+      }
+    });
+
+    let response;
+    if (post.is_liked) {
+      response = await api.post(`/posts/${post.id}/like`);
+    } else {
+      response = await api.delete(`/posts/${post.id}/like`);
+    }
+    
+    // サーバーからの応答で状態を更新
+    if (response.data) {
+      post.likes_count = response.data.likes_count;
+      post.is_liked = response.data.is_liked;
+      
+      // 他のリストも更新
+      [recommendedPosts.value, followingPosts.value].forEach(posts => {
+        const otherPost = posts.find(p => p.id === post.id);
+        if (otherPost && otherPost !== post) {
+          otherPost.is_liked = post.is_liked;
+          otherPost.likes_count = post.likes_count;
+        }
+      });
+    }
+  } catch (e: any) {
+    console.error('Failed to toggle like:', e);
+    
+    // 409エラー（既にいいね済み/未いいね）の場合は、サーバーの状態に合わせる
+    if (e.response?.status === 409 || e.response?.status === 404) {
+      // サーバーから最新の投稿情報を取得して同期
+      try {
+        const postResponse = await api.get(`/posts/${post.id}`);
+        if (postResponse.data?.post) {
+          post.is_liked = postResponse.data.post.is_liked;
+          post.likes_count = postResponse.data.post.likes_count;
+          
+          // 他のリストも更新
+          [recommendedPosts.value, followingPosts.value].forEach(posts => {
+            const otherPost = posts.find(p => p.id === post.id);
+            if (otherPost && otherPost !== post) {
+              otherPost.is_liked = post.is_liked;
+              otherPost.likes_count = post.likes_count;
+            }
+          });
+        }
+      } catch (syncError) {
+        console.error('Failed to sync post state:', syncError);
+        // 同期失敗時はロールバック
+        post.is_liked = !post.is_liked;
+        post.likes_count = (post.likes_count || 0) + (post.is_liked ? 1 : -1);
+      }
+    } else {
+      // その他のエラーの場合はロールバック
+      post.is_liked = !post.is_liked;
+      post.likes_count = (post.likes_count || 0) + (post.is_liked ? 1 : -1);
+      
+      // 他のリストもロールバック
+      [recommendedPosts.value, followingPosts.value].forEach(posts => {
+        const otherPost = posts.find(p => p.id === post.id);
+        if (otherPost && otherPost !== post) {
+          otherPost.is_liked = post.is_liked;
+          otherPost.likes_count = post.likes_count;
+        }
+      });
+    }
+  } finally {
+    likingPostIds.value.delete(post.id);
+  }
 };
 
 // おすすめ投稿を取得

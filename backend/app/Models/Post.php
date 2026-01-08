@@ -59,6 +59,25 @@ class Post extends Model
     }
 
     /**
+     * 投稿へのいいね一覧
+     */
+    public function likes(): HasMany
+    {
+        return $this->hasMany(PostLike::class);
+    }
+
+    /**
+     * 指定したユーザーがこの投稿にいいねしているかチェック
+     */
+    public function isLikedBy(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        return $this->likes()->where('user_id', $user->id)->exists();
+    }
+
+    /**
      * ベスト添削
      */
     public function bestCritique(): BelongsTo

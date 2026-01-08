@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Post;
+use App\Models\PostLike;
 use App\Models\Repost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,12 @@ class PostController extends Controller
             ->toArray();
         $userRepostedPostIdSet = array_flip($userRepostedPostIds);
         
+        // ユーザーがいいねした投稿IDを事前に取得（N+1対策）
+        $userLikedPostIds = PostLike::where('user_id', $user->id)
+            ->pluck('post_id')
+            ->toArray();
+        $userLikedPostIdSet = array_flip($userLikedPostIds);
+        
         // フォロー中のユーザーの直接投稿を取得
         $directPosts = Post::whereIn('user_id', $followingIds)
             ->with('user:id,name,username')
@@ -41,10 +48,12 @@ class PostController extends Controller
             }])
             ->withCount('reposts')
             ->withCount('critiques')
+            ->withCount('likes')
             ->get()
-            ->map(function ($post) use ($userRepostedPostIdSet) {
+            ->map(function ($post) use ($userRepostedPostIdSet, $userLikedPostIdSet) {
                 $post->display_at = $post->created_at;
                 $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
+                $post->is_liked_by_user = isset($userLikedPostIdSet[$post->id]);
                 return $post;
             });
         
@@ -58,13 +67,16 @@ class PostController extends Controller
                             ->limit(1);
                     }])
                     ->withCount('reposts')
-                    ->withCount('critiques');
+                    ->withCount('reposts')
+                    ->withCount('critiques')
+                    ->withCount('likes');
             }])
             ->get()
-            ->map(function ($repost) use ($userRepostedPostIdSet) {
+            ->map(function ($repost) use ($userRepostedPostIdSet, $userLikedPostIdSet) {
                 $post = $repost->post;
                 $post->display_at = $repost->created_at;
                 $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
+                $post->is_liked_by_user = isset($userLikedPostIdSet[$post->id]);
                 return $post;
             });
         
@@ -93,10 +105,10 @@ class PostController extends Controller
     /**
      * おすすめ投稿取得（全ユーザーの投稿）
      */
-    public function recommended(): JsonResponse
+    public function recommended(Request $request): JsonResponse
     {
         /** @var \App\Models\User $user */
-        $user = Auth::user();
+        $user = Auth::guard('sanctum')->user();
         
         // ユーザーがリポストした投稿IDを事前に取得（N+1対策）
         $userRepostedPostIdSet = [];
@@ -106,6 +118,15 @@ class PostController extends Controller
                 ->toArray();
             $userRepostedPostIdSet = array_flip($userRepostedPostIds);
         }
+        
+        // ユーザーがいいねした投稿IDを事前に取得（N+1対策）
+        $userLikedPostIdSet = [];
+        if ($user) {
+            $userLikedPostIds = PostLike::where('user_id', $user->id)
+                ->pluck('post_id')
+                ->toArray();
+            $userLikedPostIdSet = array_flip($userLikedPostIds);
+        }
 
         $posts = Post::with('user:id,name,username')
             ->with(['critiques' => function ($query) {
@@ -114,12 +135,15 @@ class PostController extends Controller
                     ->limit(1);
             }])
             ->withCount('reposts')
+            ->withCount('reposts')
             ->withCount('critiques')
+            ->withCount('likes')
             ->orderBy('created_at', 'desc')
             ->limit(50)
             ->get()
-            ->map(function ($post) use ($user, $userRepostedPostIdSet) {
+            ->map(function ($post) use ($user, $userRepostedPostIdSet, $userLikedPostIdSet) {
                 $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
+                $post->is_liked_by_user = isset($userLikedPostIdSet[$post->id]);
                 return $this->formatPost($post, $user);
             });
 
@@ -287,7 +311,7 @@ class PostController extends Controller
         $post->loadCount('reposts');
         
         /** @var \App\Models\User $user */
-        $user = Auth::user();
+        $user = Auth::guard('sanctum')->user();
         
         if ($user) {
             $post->user_reposted = Repost::where('user_id', $user->id)
@@ -332,7 +356,7 @@ class PostController extends Controller
         $user = \App\Models\User::where('username', $username)->firstOrFail();
         
         /** @var \App\Models\User $currentUser */
-        $currentUser = Auth::user();
+        $currentUser = Auth::guard('sanctum')->user();
         
         // 現在のユーザーがリポストした投稿IDを事前に取得（N+1対策）
         $userRepostedPostIdSet = [];
@@ -342,14 +366,25 @@ class PostController extends Controller
                 ->toArray();
             $userRepostedPostIdSet = array_flip($userRepostedPostIds);
         }
+        
+        // ユーザーがいいねした投稿IDを事前に取得（N+1対策）
+        $userLikedPostIdSet = [];
+        if ($currentUser) {
+            $userLikedPostIds = PostLike::where('user_id', $currentUser->id)
+                ->pluck('post_id')
+                ->toArray();
+            $userLikedPostIdSet = array_flip($userLikedPostIds);
+        }
 
         $posts = Post::where('user_id', $user->id)
             ->with('user:id,name,username')
             ->withCount('reposts')
+            ->withCount('likes')
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($post) use ($currentUser, $userRepostedPostIdSet) {
+            ->map(function ($post) use ($currentUser, $userRepostedPostIdSet, $userLikedPostIdSet) {
                 $post->user_reposted = isset($userRepostedPostIdSet[$post->id]);
+                $post->is_liked_by_user = isset($userLikedPostIdSet[$post->id]);
                 return $this->formatPost($post, $currentUser);
             });
 
@@ -415,6 +450,57 @@ class PostController extends Controller
     }
 
     /**
+     * 投稿にいいねする
+     */
+    public function like(Post $post): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 既にいいねしているかチェック
+        if ($post->isLikedBy($user)) {
+             return response()->json([
+                'message' => '既にいいねしています',
+            ], 409);
+        }
+
+        $post->likes()->create([
+            'user_id' => $user->id,
+        ]);
+
+        return response()->json([
+            'message' => 'いいねしました',
+            'likes_count' => $post->likes()->count(),
+            'is_liked' => true,
+        ], 201);
+    }
+
+    /**
+     * 投稿のいいねを取り消す
+     */
+    public function unlike(Post $post): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $like = $post->likes()->where('user_id', $user->id)->first();
+
+        if (!$like) {
+            return response()->json([
+                'message' => 'いいねしていません',
+            ], 404);
+        }
+
+        $like->delete();
+
+        return response()->json([
+            'message' => 'いいねを取り消しました',
+            'likes_count' => $post->likes()->count(),
+            'is_liked' => false,
+        ], 200);
+    }
+
+    /**
      * 投稿をフォーマットして返す
      */
     private function formatPost(Post $post, ?\App\Models\User $user = null): array
@@ -422,7 +508,9 @@ class PostController extends Controller
         // Eager load済みのデータを使用（N+1クエリ対策）
         $reposts_count = $post->reposts_count ?? 0;
         $critiques_count = $post->critiques_count ?? 0;
+        $likes_count = $post->likes_count ?? 0;
         $isReposted = $post->user_reposted ?? false;
+        $isLiked = $post->is_liked_by_user ?? $post->isLikedBy($user);
 
         // ストレージ URL を構築（config から取得）
         $image_url = null;
@@ -452,7 +540,9 @@ class PostController extends Controller
             'user' => $post->user->only(['id', 'name', 'username']),
             'reposts_count' => $reposts_count,
             'critiques_count' => $critiques_count,
+            'likes_count' => $likes_count,
             'is_reposted' => $isReposted,
+            'is_liked' => $isLiked,
             'first_critique' => $first_critique,
             'reward_amount' => $post->reward_amount,
             'stripe_payment_intent_id' => $post->stripe_payment_intent_id,
