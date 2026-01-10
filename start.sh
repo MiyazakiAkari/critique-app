@@ -1,7 +1,7 @@
 #!/bin/sh
-# Startup script for AWS Lightsail
+# Startup script for AWS Lightsail (Apache version)
 
-echo "🚀 Starting Critique Application..."
+echo "🚀 Starting Critique Application (Apache)..."
 
 # Run migrations if DB is configured
 if [ -n "$DB_HOST" ]; then
@@ -14,13 +14,11 @@ if [ -n "$DB_HOST" ]; then
     echo "📁 Ensuring storage directories exist..."
     mkdir -p storage/app/public/posts
     chmod -R 777 storage/app/public
+    
+    # Apache runs as www-data, ensure it owns the storage
+    chown -R www-data:www-data storage/app/public
 fi
 
-# Start PHP-FPM in background
-echo "▶️  Starting PHP-FPM..."
-php-fpm -D
-
-# Start Nginx in foreground
-echo "▶️  Starting Nginx..."
-exec nginx -g "daemon off;"
-
+# Start Apache in foreground
+echo "▶️  Starting Apache..."
+exec apache2-foreground

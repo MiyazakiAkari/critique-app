@@ -1,6 +1,5 @@
 # ========== Stage 1: Frontend Build ==========
 FROM node:20-alpine AS frontend-builder
-
 WORKDIR /frontend
 
 COPY frontend/package*.json ./
@@ -10,26 +9,19 @@ COPY frontend .
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
-# ========== Stage 2: Laravel with PHP ==========
-FROM php:8.2-fpm-alpine
+# ========== Stage 2: Laravel with Apache ==========
+FROM php:8.2-apache
 
 # Install system dependencies
-RUN apk add --no-cache \
-    nginx \
-    curl \
-    git \
-    unzip \
-    postgresql-dev \
-    linux-headers \
-    oniguruma-dev \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    libpng \
-    libjpeg-turbo \
-    freetype \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_pgsql bcmath mbstring fileinfo exif gd
+RUN apt-get update && apt-get install -y \
+    zip unzip git curl \
+    libpng-dev libonig-dev libxml2-dev libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql mbstring bcmath gd
+
+# Configure Apache DocumentRoot
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+RUN sed -ri 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN a2enmod rewrite
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -47,46 +39,25 @@ RUN mkdir -p storage/framework/cache \
     && mkdir -p storage/framework/views \
     && mkdir -p storage/logs \
     && mkdir -p storage/app/public/posts \
-    && mkdir -p bootstrap/cache \
-    && mkdir -p /var/lib/nginx/logs \
-    && mkdir -p /run/nginx
+    && mkdir -p bootstrap/cache
 
 RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Copy frontend build (merge with existing public, don't overwrite index.php)
-COPY --from=frontend-builder /frontend/dist/index.html ./public/index.html
-COPY --from=frontend-builder /frontend/dist/assets ./public/assets
-COPY --from=frontend-builder /frontend/dist/vite.svg ./public/vite.svg
+# Copy frontend build
+COPY --from=frontend-builder /frontend/dist ./public
 
-# Generate package manifest and set permissions
-RUN php artisan package:discover --ansi || true \
-    && chmod -R 777 storage bootstrap/cache \
-    && chown -R nobody:nobody storage bootstrap/cache public \
-    && chown -R nginx:nginx /var/lib/nginx /run/nginx \
-    && chmod -R 755 /var/lib/nginx
-
-# Configure Nginx
-COPY nginx/default.conf /etc/nginx/http.d/default.conf
-
-# Configure PHP-FPM to listen on port 9000
-RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/' /usr/local/etc/php-fpm.d/www.conf || true \
-    && sed -i 's/;catch_workers_output = yes/catch_workers_output = yes/' /usr/local/etc/php-fpm.d/www.conf || true \
-    && sed -i 's/;decorate_workers_output = no/decorate_workers_output = no/' /usr/local/etc/php-fpm.d/www.conf || true
-
-# Increase upload limits
+# PHP Configs (Increase upload limits)
 RUN echo "upload_max_filesize = 10M" > /usr/local/etc/php/conf.d/uploads.ini \
     && echo "post_max_size = 12M" >> /usr/local/etc/php/conf.d/uploads.ini \
-    && echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/uploads.ini \
-    && echo "log_errors = On" >> /usr/local/etc/php/conf.d/uploads.ini \
-    && echo "error_log = /dev/stderr" >> /usr/local/etc/php/conf.d/uploads.ini
+    && echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/uploads.ini
+
+# Set permissions
+RUN chown -R www-data:www-data storage bootstrap/cache public
 
 # Copy startup script
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Set permissions
-RUN chown -R nobody:nobody /var/www/html
-
-EXPOSE 8000
+EXPOSE 80
 
 CMD ["/start.sh"]
