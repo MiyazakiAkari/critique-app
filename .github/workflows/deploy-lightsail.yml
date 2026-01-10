@@ -96,8 +96,10 @@ jobs:
             "containerPort": 80,
             "healthCheck": {
               "path": "/",
-              "intervalSeconds": 30,
-              "timeoutSeconds": 10
+              "intervalSeconds": 60,
+              "timeoutSeconds": 30,
+              "healthyThreshold": 2,
+              "unhealthyThreshold": 5
             }
           }
           EOF
