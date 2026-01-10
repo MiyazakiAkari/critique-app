@@ -71,7 +71,7 @@ jobs:
               "app": {
                 "image": $image,
                 "ports": {
-                  "8000": "HTTP"
+                  "80": "HTTP"
                 },
                 "environment": {
                   "APP_NAME": "CritiqueApp",
@@ -93,7 +93,7 @@ jobs:
           cat > public-endpoint.json << EOF
           {
             "containerName": "app",
-            "containerPort": 8000,
+            "containerPort": 80,
             "healthCheck": {
               "path": "/",
               "intervalSeconds": 30,
