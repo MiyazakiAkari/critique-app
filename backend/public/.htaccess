@@ -13,8 +13,24 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Send Requests To Front Controller...
+    # API routes go to Laravel
+    RewriteCond %{REQUEST_URI} ^/api/
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+
+    # Sanctum routes go to Laravel
+    RewriteCond %{REQUEST_URI} ^/sanctum/
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+
+    # Storage files (serve directly)
+    RewriteCond %{REQUEST_URI} ^/storage/
+    RewriteRule ^ - [L]
+
+    # All other routes go to Vue SPA (index.html)
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.html [L]
 </IfModule>
