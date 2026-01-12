@@ -386,6 +386,11 @@
                       </div>
                       <p class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">{{ critique.content }}</p>
                       
+                      <!-- 添削画像 -->
+                      <div v-if="critique.image_url" class="mt-2 rounded-xl overflow-hidden border border-gray-200 cursor-pointer w-full max-w-sm" @click="openImageModal(critique.image_url)">
+                        <img :src="critique.image_url" alt="添削画像" class="w-full max-h-64 object-cover hover:opacity-95 transition" />
+                      </div>
+                      
                       <!-- いいねボタン -->
                       <div class="flex items-center mt-2">
                         <button 
@@ -442,6 +447,37 @@
                       >
                         {{ submittingCritique[post.id] ? '送信中...' : '添削する' }}
                       </button>
+                    </div>
+                    
+                    <!-- 画像プレビュー -->
+                    <div v-if="critiqueImagePreviews[post.id]" class="relative mt-2 rounded-xl overflow-hidden border border-gray-200 w-full max-w-sm">
+                      <img :src="critiqueImagePreviews[post.id]!" alt="Preview" class="w-full max-h-64 object-cover" />
+                      <button 
+                        @click="removeCritiqueImage(post.id)"
+                        class="absolute top-2 right-2 bg-gray-900 bg-opacity-75 text-white rounded-full p-1.5 hover:bg-opacity-90"
+                        aria-label="画像を削除"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <!-- 画像選択ボタン -->
+                    <div class="mt-2">
+                      <input 
+                        type="file" 
+                        :id="`critique-image-upload-${post.id}`" 
+                        accept="image/*" 
+                        class="hidden"
+                        @change="(e) => handleCritiqueImageSelect(e, post.id)"
+                      />
+                      <label :for="`critique-image-upload-${post.id}`" class="inline-flex items-center space-x-1 text-blue-500 hover:text-blue-600 cursor-pointer text-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>画像を追加</span>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -639,6 +675,8 @@ interface Critique {
   };
   likes_count: number;
   is_liked: boolean;
+  image_url?: string;
+  image_path?: string;
 }
 
 const envMaxRewardAmount = Number(import.meta.env.VITE_MAX_REWARD_AMOUNT);
@@ -707,6 +745,8 @@ const deleteTarget = ref<DeleteTarget | null>(null);
 const critiquesMap = ref<Record<number, Critique[]>>({});
 const expandedPosts = ref<Set<number>>(new Set());
 const critiqueContent = ref<Record<number, string>>({});
+const critiqueImages = ref<Record<number, File | null>>({});
+const critiqueImagePreviews = ref<Record<number, string | null>>({});
 const submittingCritique = ref<Record<number, boolean>>({});
 const openCritiqueMenuId = ref<number | null>(null);
 const openPostMenuId = ref<number | null>(null);
@@ -1081,11 +1121,22 @@ const togglePostExpansion = async (postId: number) => {
 // 添削を作成
 const createCritique = async (postId: number) => {
   const content = critiqueContent.value[postId]?.trim();
-  if (!content) return;
+  const image = critiqueImages.value[postId];
+  
+  if (!content && !image) return;
   
   try {
     submittingCritique.value[postId] = true;
-    const response = await api.post(`/posts/${postId}/critiques`, { content });
+    
+    const formData = new FormData();
+    if (content) {
+      formData.append('content', content);
+    }
+    if (image) {
+      formData.append('image', image);
+    }
+
+    const response = await api.post(`/posts/${postId}/critiques`, formData);
     
     // 添削リストを更新
     if (!critiquesMap.value[postId]) {
@@ -1098,12 +1149,43 @@ const createCritique = async (postId: number) => {
     
     // フォームをクリア
     critiqueContent.value[postId] = '';
+    removeCritiqueImage(postId);
   } catch (e: any) {
     console.error('Failed to create critique:', e);
     error.value = e.response?.data?.message || '添削の投稿に失敗しました';
   } finally {
     submittingCritique.value[postId] = false;
   }
+};
+
+// 添削画像選択ハンドラー
+const handleCritiqueImageSelect = (event: Event, postId: number) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  
+  if (file) {
+    critiqueImages.value[postId] = file;
+    
+    // プレビュー用のURLを作成
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      critiqueImagePreviews.value[postId] = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+// 添削画像削除ハンドラー
+const removeCritiqueImage = (postId: number) => {
+  if (critiqueImagePreviews.value[postId]) {
+    URL.revokeObjectURL(critiqueImagePreviews.value[postId]!);
+  }
+  delete critiqueImages.value[postId];
+  delete critiqueImagePreviews.value[postId];
+  
+  // input要素をリセット
+  const fileInput = document.getElementById(`critique-image-upload-${postId}`) as HTMLInputElement;
+  if (fileInput) fileInput.value = '';
 };
 
 // 添削メニューのトグル
@@ -1352,6 +1434,8 @@ defineExpose({
   critiquesMap,
   expandedPosts,
   critiqueContent,
+  critiqueImages,
+  critiqueImagePreviews,
   submittingCritique,
   openCritiqueMenuId,
   openPostMenuId,
@@ -1373,6 +1457,9 @@ defineExpose({
   toggleRepost,
   confirmRepost,
   executeUnrepost,
+  createCritique,
+  handleCritiqueImageSelect,
+  removeCritiqueImage,
   closeMenuOnOutsideClick,
 });
 </script>
