@@ -12,6 +12,19 @@ vi.mock('../utils/axios', () => ({
     get: vi.fn(),
     post: vi.fn(),
     delete: vi.fn(),
+    defaults: {
+      headers: {
+        common: {},
+      },
+    },
+    interceptors: {
+      response: {
+        use: vi.fn(),
+      },
+      request: {
+        use: vi.fn(),
+      },
+    },
   },
 }))
 
@@ -424,6 +437,106 @@ describe('HomePage.vue', () => {
         // メニューが閉じられる
         expect(wrapper.vm.openCritiqueMenuId).toBeNull()
       }
+    })
+  })
+
+  describe('添削画像機能', () => {
+    it('添削画像を選択してプレビューを表示できる', async () => {
+      const wrapper: VueWrapper<HomePageComponent> = mount(HomePage, {
+        global: {
+          plugins: [router],
+          stubs: ['Teleport'],
+        },
+      })
+
+      const file = new File(['test'], 'test.png', { type: 'image/png' })
+      const event = {
+        target: {
+          files: [file],
+        },
+      } as unknown as Event
+
+      // 画像選択ハンドラーを呼び出す
+      wrapper.vm.handleCritiqueImageSelect(event, 1)
+
+      // 画像がstateに設定される
+      expect(wrapper.vm.critiqueImages[1]).toBe(file)
+
+      // プレビューURLが生成される（URL.createObjectURLはjsdomでモックが必要だが、コンポーネント内ではFileReaderを使用している）
+      // FileReaderのモックは簡単ではないため、stateの更新のみを確認
+    })
+
+    it('添削画像を削除できる', async () => {
+      const wrapper: VueWrapper<HomePageComponent> = mount(HomePage, {
+        global: {
+          plugins: [router],
+          stubs: ['Teleport'],
+        },
+      })
+
+      // 初期状態設定
+      const file = new File(['test'], 'test.png', { type: 'image/png' })
+      wrapper.vm.critiqueImages[1] = file
+      wrapper.vm.critiqueImagePreviews[1] = 'blob:http://localhost/test'
+
+      // URL.revokeObjectURLをモック
+      const originalRevoke = window.URL.revokeObjectURL
+      window.URL.revokeObjectURL = vi.fn()
+
+      // 画像削除
+      wrapper.vm.removeCritiqueImage(1)
+
+      // stateから削除される
+      expect(wrapper.vm.critiqueImages[1]).toBeUndefined()
+      expect(wrapper.vm.critiqueImagePreviews[1]).toBeUndefined()
+      expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/test')
+
+      // クリーンアップ
+      window.URL.revokeObjectURL = originalRevoke
+    })
+
+    it('画像付きで添削を投稿できる', async () => {
+      const wrapper: VueWrapper<HomePageComponent> = mount(HomePage, {
+        global: {
+          plugins: [router],
+          stubs: ['Teleport'],
+        },
+      })
+
+      // データ設定
+      wrapper.vm.critiqueContent[1] = 'With image'
+      const file = new File(['test'], 'test.png', { type: 'image/png' })
+      wrapper.vm.critiqueImages[1] = file
+
+      // APIモック
+      const mockResponse = {
+        id: 11,
+        content: 'With image',
+        image_path: 'critiques/test.png',
+        image_url: 'http://localhost/storage/critiques/test.png',
+        created_at: new Date().toISOString(),
+        user: { id: 1, name: 'User', username: 'user' },
+        likes_count: 0,
+        is_liked: false
+      }
+      vi.mocked(api.post).mockResolvedValue({ data: mockResponse })
+
+      // 投稿実行
+      await wrapper.vm.createCritique(1)
+
+      // FormDataが正しく送信されたか確認
+      expect(api.post).toHaveBeenCalledTimes(1)
+      const calls = vi.mocked(api.post).mock.calls
+      const [url, formData] = calls[0]!
+      expect(url).toBe('/posts/1/critiques')
+      expect(formData).toBeInstanceOf(FormData)
+      expect((formData as FormData).get('content')).toBe('With image')
+      const imageFile = (formData as FormData).get('image') as File
+      expect(imageFile).toBeInstanceOf(File)
+      expect(imageFile.name).toBe('test.png')
+
+      // 投稿後、画像stateがクリアされる
+      expect(wrapper.vm.critiqueImages[1]).toBeUndefined()
     })
   })
 

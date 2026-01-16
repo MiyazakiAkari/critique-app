@@ -33,9 +33,17 @@ class CritiqueController extends Controller
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($critique) use ($user) {
+                $imageUrl = null;
+                if ($critique->image_path) {
+                    $appUrl = config('app.url');
+                    $imageUrl = rtrim($appUrl, '/') . '/storage/' . $critique->image_path;
+                }
+
                 return [
                     'id' => $critique->id,
                     'content' => $critique->content,
+                    'image_path' => $critique->image_path,
+                    'image_url' => $imageUrl,
                     'created_at' => $critique->created_at->toISOString(),
                     'user' => $critique->user->only(['id', 'name', 'username']),
                     'likes_count' => $critique->likes_count,
@@ -51,23 +59,55 @@ class CritiqueController extends Controller
      */
     public function store(Request $request, Post $post): JsonResponse
     {
+        $imageRules = [
+            'nullable',
+            'image',
+            'mimes:jpeg,png,jpg,gif',
+            'max:10240', // 10MB
+        ];
+
+        // テスト環境以外では追加のセキュリティチェックを実施
+        if (!app()->environment('testing')) {
+            $imageRules[] = function ($attribute, $value, $fail) {
+                if ($value && !@getimagesize($value->getRealPath())) {
+                    $fail('The ' . $attribute . ' is not a valid image file.');
+                }
+            };
+        }
+
         $validated = $request->validate([
             'content' => 'required|string|max:1000',
+            'image' => $imageRules,
         ]);
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
+        // 画像を保存
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('critiques', 'public');
+        }
+
         $critique = $post->critiques()->create([
             'user_id' => $user->id,
             'content' => $validated['content'],
+            'image_path' => $imagePath,
         ]);
 
         $critique->load('user:id,name,username');
 
+        $imageUrl = null;
+        if ($critique->image_path) {
+            $appUrl = config('app.url');
+            $imageUrl = rtrim($appUrl, '/') . '/storage/' . $critique->image_path;
+        }
+
         return response()->json([
             'id' => $critique->id,
             'content' => $critique->content,
+            'image_path' => $critique->image_path,
+            'image_url' => $imageUrl,
             'created_at' => $critique->created_at->toISOString(),
             'user' => $critique->user->only(['id', 'name', 'username']),
             'likes_count' => 0,

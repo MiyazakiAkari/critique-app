@@ -91,6 +91,36 @@ class CritiqueTest extends TestCase
     }
 
     /**
+     * 画像付きの添削を作成できる
+     */
+    public function test_authenticated_user_can_create_critique_with_image(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        $image = \Illuminate\Http\Testing\File::image('test.png');
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/posts/{$post->id}/critiques", [
+                'content' => 'Critique with image',
+                'image' => $image,
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('content', 'Critique with image')
+            ->assertJsonPath('user.id', $user->id);
+
+        $this->assertDatabaseHas('critiques', [
+            'post_id' => $post->id,
+            'user_id' => $user->id,
+            'content' => 'Critique with image',
+        ]);
+
+        $critique = Critique::where('content', 'Critique with image')->first();
+        $this->assertNotNull($critique->image_path);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($critique->image_path);
+    }
+
+    /**
      * 未認証ユーザーは添削を作成できない
      */
     public function test_unauthenticated_user_cannot_create_critique(): void
